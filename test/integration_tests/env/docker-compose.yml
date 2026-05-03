@@ -1,0 +1,33 @@
+services:
+  mqtt_broker:
+    build:
+      dockerfile: mqtt_broker.dockerfile
+      context: .
+    network_mode: host
+  test:
+    depends_on: [ mqtt_broker ]
+    image: ubuntu:22.04
+    command: >
+        bash -c "chmod +x /home/bin/hacpp-integration-tests &&
+        /home/bin/hacpp-integration-tests ${CMD_OPTIONS}
+        "
+    volumes:
+      - ${ARTIFACTS_DIR}:/home/bin
+    network_mode: host
+
+  mqtt_explorer:
+    depends_on: [ mqtt_broker ]
+    image: ghcr.io/thomasnordquist/mqtt-explorer:latest
+    environment:
+      - MQTT_HOST=localhost
+      - MQTT_PORT=1883
+      - MQTT_EXPLORER_USERNAME=${MQTT_EXPLORER_USERNAME}
+      - MQTT_EXPLORER_PASSWORD=${MQTT_EXPLORER_PASSWORD}
+    volumes:
+      - mqtt_explorer_data:/app/data
+    ports:
+      - "4000:4000"
+    network_mode: host
+
+volumes:
+  mqtt_explorer_data:

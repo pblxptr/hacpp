@@ -1,0 +1,63 @@
+{
+  "version": 6,
+  "include": [
+    "cmake/presets/type.json",
+    "cmake/presets/app.json",
+    "cmake/presets/dependencies.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "linux-native-conan-gcc-debug",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build",
+      "inherits": [
+        "debug",
+        "conan"
+      ]
+    },
+    {
+      "name": "linux-native-conan-gcc-release",
+      "generator": "Unix Makefiles",
+      "inherits": [
+        "release",
+        "conan"
+      ]
+    },
+    {
+      "name": "linux-native-conan-gcc-debug-asan",
+      "generator": "Unix Makefiles",
+      "inherits": [
+        "debug",
+        "conan",
+        "asan"
+      ]
+    },
+    {
+      "name": "linux-native-conan-gcc-debug-tsan",
+      "generator": "Unix Makefiles",
+      "inherits": [
+        "debug",
+        "conan",
+        "tsan"
+      ]
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux-native-conan-gcc-debug",
+      "configurePreset": "linux-native-conan-gcc-debug"
+    },
+    {
+      "name": "linux-native-conan-gcc-release",
+      "configurePreset": "linux-native-conan-gcc-release"
+    },
+    {
+      "name": "linux-native-conan-gcc-debug-asan",
+      "configurePreset": "linux-native-conan-gcc-debug-asan"
+    },
+    {
+      "name": "linux-native-conan-gcc-debug-tsan",
+      "configurePreset": "linux-native-conan-gcc-debug-tsan"
+    }
+  ]
+}
