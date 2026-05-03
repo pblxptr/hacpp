@@ -25,7 +25,8 @@ boost::asio::awaitable<ClientType> get_verifier(boost::asio::any_io_executor exe
 
     auto sub_topics = std::vector<TopicSubopts>{
         { component_discovery_topic(BinarySensor::Defs::Component, UniqueId), QoS::at_most_once },
-        { default_component_state_topic(BinarySensor::Defs::Component, UniqueId), QoS::at_most_once }
+        { default_component_state_topic(BinarySensor::Defs::Component, UniqueId), QoS::at_most_once },
+        { default_component_availability_topic(BinarySensor::Defs::Component, UniqueId), QoS::at_most_once }
     };
 
     err = co_await client.async_subscribe(sub_topics);
@@ -85,6 +86,7 @@ TEST_CASE("Binary sensor can update its state")
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         auto binary_sensor = Factory<BinarySensor>(UniqueId, std::move(entity_client))
+            .set(Availability::Opt::Topic, default_component_availability_topic(BinarySensor::Defs::Component, UniqueId))
             .create();
         auto err1 = co_await binary_sensor.async_discovery();
         auto packet = co_await async_recv_packet<PublishPacket>(verifier_client);
@@ -97,7 +99,7 @@ TEST_CASE("Binary sensor can update its state")
 
             // Assert
             REQUIRE(!err);
-            REQUIRE(packet.topic() == binary_sensor.config().cfg.at(BinarySensor::Opt::StateTopic));
+            REQUIRE(packet.topic() == binary_sensor.config().at(BinarySensor::Opt::StateTopic));
             REQUIRE(packet.payload() == BinarySensor::Defs::PayloadOn);
             co_await binary_sensor.async_close();
             co_await verifier_client.async_close();
@@ -110,11 +112,57 @@ TEST_CASE("Binary sensor can update its state")
 
             // Assert
             REQUIRE(!err);
-            REQUIRE(packet.topic() == binary_sensor.config().cfg.at(BinarySensor::Opt::StateTopic));
+            REQUIRE(packet.topic() == binary_sensor.config().at(BinarySensor::Opt::StateTopic));
             REQUIRE(packet.payload() == BinarySensor::Defs::PayloadOff);
             co_await binary_sensor.async_close();
             co_await verifier_client.async_close();
         }
+    }, rethrow);
+
+    io.run();
+}
+
+TEST_CASE("Binary sensor can update its availability")
+{
+    // Arrange
+    auto io = boost::asio::io_context{};
+    auto strand = boost::asio::make_strand(io);
+
+    boost::asio::co_spawn(strand, [&strand]() mutable -> boost::asio::awaitable<void> {
+        auto entity_client = co_await get_client(strand);
+        auto verifier_client = co_await get_verifier(strand);
+        auto binary_sensor = Factory<BinarySensor>(UniqueId, std::move(entity_client))
+            .set(Availability::Opt::Topic, default_component_availability_topic(BinarySensor::Defs::Component, UniqueId))
+            .create();
+
+        auto err_disc = co_await binary_sensor.async_discovery();
+        REQUIRE(!err_disc);
+        auto packet_disc = co_await async_recv_packet<PublishPacket>(verifier_client);
+
+        SECTION("provides 'online' state") {
+            // Act
+            auto err = co_await binary_sensor.async_update_availability(true);
+            auto packet = co_await async_recv_packet<PublishPacket>(verifier_client);
+
+            // Assert
+            REQUIRE(!err);
+            REQUIRE(packet.topic() == default_component_availability_topic(BinarySensor::Defs::Component, UniqueId));
+            REQUIRE(packet.payload() == Availability::Defs::PayloadAvailable);
+        }
+
+        SECTION("provides 'offline' state") {
+            // Act
+            auto err = co_await binary_sensor.async_update_availability(false);
+            auto packet = co_await async_recv_packet<PublishPacket>(verifier_client);
+
+            // Assert
+            REQUIRE(!err);
+            REQUIRE(packet.topic() == default_component_availability_topic(BinarySensor::Defs::Component, UniqueId));
+            REQUIRE(packet.payload() == Availability::Defs::PayloadNotAvailable);
+        }
+
+        co_await binary_sensor.async_close();
+        co_await verifier_client.async_close();
     }, rethrow);
 
     io.run();

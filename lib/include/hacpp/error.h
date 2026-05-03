@@ -14,6 +14,7 @@ namespace hacpp::mqtt {
         ConnectionRefused,
         PacketNotAllowedToSend, // TODO: Perhaps too specific?
         NotConnected,
+        InvalidConfig,
         UnknownError
     };
 
@@ -44,6 +45,7 @@ namespace hacpp::mqtt {
                 case ErrorCode::ConnectionRefused: return "connection_refused";
                 case ErrorCode::PacketNotAllowedToSend: return "packet_not_allowed_to_send";
                 case ErrorCode::NotConnected: return "not_connected";
+                case ErrorCode::InvalidConfig: return "invalid_config";
                 case ErrorCode::UnknownError: return "unknown_error";
                 default: return "unknown_error";
             }

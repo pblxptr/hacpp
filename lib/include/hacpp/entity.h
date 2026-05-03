@@ -28,22 +28,17 @@ namespace hacpp::mqtt {
 
 
     struct Availability {
-        // struct Opt {
-        //     constexpr static Property Topic {"topic", "availability"};
-        //     constexpr static Property PayloadAvailable {"payload_available", "availability"};
-        //     constexpr static Property PayloadNotAvailable {"payload_not_available", "availability"};
-        //     constexpr static Property ValueTemplate {"value_template", "availability"};
-        // };
+        struct Opt {
+            constexpr static Property Topic {"topic", "availability"};
+            constexpr static Property PayloadAvailable {"payload_available", "availability"};
+            constexpr static Property PayloadNotAvailable {"payload_not_available", "availability"};
+            constexpr static Property ValueTemplate {"value_template", "availability"};
+        };
 
         struct Defs {
             constexpr static auto PayloadAvailable = "online";
             constexpr static auto PayloadNotAvailable = "offline";
         };
-
-        std::string topic;
-        std::string payload_available;
-        std::string payload_not_available;
-        std::string value_template;
     };
 
 
@@ -96,9 +91,13 @@ public:
         // obj_["device"] = boost::json::serialize(device);
     }
 
-    void set(const Availability& availability)
+    bool contains(const Property& prop) const
     {
-        // obj_["availability"] = boost::json::serialize(availability);
+        if (prop.obj_key.empty()) {
+            return obj_.contains(prop.key);
+        }
+
+        return obj_.contains(prop.obj_key) && obj_.at(prop.obj_key).as_object().contains(prop.key);
     }
 
     auto json() const

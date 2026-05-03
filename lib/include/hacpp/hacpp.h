@@ -22,4 +22,9 @@ namespace hacpp::mqtt {
     {
         return fmt::format("{}/{}/{}/set", HomeAssistantPrefix, component, unique_id);
     }
+
+    inline auto default_component_availability_topic(std::string_view component, std::string_view unique_id)
+    {
+        return fmt::format("{}/{}/{}/availability", HomeAssistantPrefix, component, unique_id);
+    }
 };

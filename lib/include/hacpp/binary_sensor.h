@@ -39,9 +39,9 @@ namespace hacpp::mqtt {
         {
         }
 
-        const auto& config() const
+        const EntityCfg& config() const
         {
-            return config_;
+            return config_.cfg;
         }
 
         boost::asio::awaitable<Error> async_update_state(bool state)
@@ -52,6 +52,27 @@ namespace hacpp::mqtt {
                     : config_.cfg[Opt::PayloadOff]
                 , config_.qos);
         }
+
+        boost::asio::awaitable<Error> async_update_availability(bool state)
+        {
+            if (!config_.cfg.contains(Availability::Opt::Topic)) {
+                co_return ErrorCode::InvalidConfig;
+            }
+
+            auto val = std::string{};
+            if (state) {
+                val = config_.cfg.contains(Availability::Opt::PayloadAvailable)
+                    ? config_.cfg[Availability::Opt::PayloadAvailable]
+                    : Availability::Defs::PayloadAvailable;
+            } else {
+                val = config_.cfg.contains(Availability::Opt::PayloadNotAvailable)
+                    ? config_.cfg[Availability::Opt::PayloadNotAvailable]
+                    : Availability::Defs::PayloadNotAvailable;
+            }
+
+            co_return co_await client_.async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
+        }
+
 
         boost::asio::awaitable<Error> async_discovery()
         {
@@ -99,12 +120,6 @@ namespace hacpp::mqtt {
         auto& set(T&& key, V&& value)
         {
             cfg_.set(std::forward<T>(key), std::forward<V>(value));
-            return *this;
-        }
-
-        auto& qos(QoS qos)
-        {
-            qos_ = qos;
             return *this;
         }
 
