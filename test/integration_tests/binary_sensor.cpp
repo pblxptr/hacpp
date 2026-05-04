@@ -7,7 +7,6 @@ using namespace hacpp::mqtt;
 
 constexpr static auto UniqueId = "binary_sensor_unique_id";
 
-
 static boost::asio::awaitable<ClientType> get_client(boost::asio::any_io_executor exe)
 {
     auto client = ClientType{exe, config};
