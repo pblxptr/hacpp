@@ -54,7 +54,7 @@ namespace hacpp::mqtt {
             }
 
             co_return co_await client_.async_publish(
-                component_discovery_topic(Defs::Component, config_.unique_id),
+                default_component_discovery_topic(Defs::Component, config_.unique_id),
                 json,
                 config_.qos
             );
