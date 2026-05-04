@@ -8,7 +8,7 @@
 namespace hacpp::mqtt {
     constexpr static auto HomeAssistantPrefix = "homeassistant";
 
-    inline auto component_discovery_topic(std::string_view component, std::string_view unique_id)
+    inline auto default_component_discovery_topic(std::string_view component, std::string_view unique_id)
     {
         return fmt::format("{}/{}/{}/config", HomeAssistantPrefix, component, unique_id);
     }

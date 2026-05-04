@@ -8,7 +8,7 @@ using namespace hacpp::mqtt;
 constexpr static auto UniqueId = "binary_sensor_unique_id";
 
 
-boost::asio::awaitable<ClientType> get_client(boost::asio::any_io_executor exe)
+static boost::asio::awaitable<ClientType> get_client(boost::asio::any_io_executor exe)
 {
     auto client = ClientType{exe, config};
     auto err = co_await client.async_connect();
@@ -17,14 +17,14 @@ boost::asio::awaitable<ClientType> get_client(boost::asio::any_io_executor exe)
     co_return client;
 }
 
-boost::asio::awaitable<ClientType> get_verifier(boost::asio::any_io_executor exe)
+static boost::asio::awaitable<ClientType> get_verifier(boost::asio::any_io_executor exe)
 {
     auto client = ClientType{exe, config};
     auto err = co_await client.async_connect();
     REQUIRE(!err);
 
     auto sub_topics = std::vector<TopicSubopts>{
-        { component_discovery_topic(BinarySensor::Defs::Component, UniqueId), QoS::at_most_once },
+        { default_component_discovery_topic(BinarySensor::Defs::Component, UniqueId), QoS::at_most_once },
         { default_component_state_topic(BinarySensor::Defs::Component, UniqueId), QoS::at_most_once },
         { default_component_availability_topic(BinarySensor::Defs::Component, UniqueId), QoS::at_most_once }
     };
@@ -64,7 +64,7 @@ TEST_CASE("Binary sensor provides all required options during discovery")
 
         // Assert
         REQUIRE(!err);
-        REQUIRE(packet.topic() == component_discovery_topic(BinarySensor::Defs::Component, UniqueId));
+        REQUIRE(packet.topic() == default_component_discovery_topic(BinarySensor::Defs::Component, UniqueId));
         auto pobj = boost::json::parse(packet.payload());
         REQUIRE(pobj.as_object().contains(BinarySensor::Opt::StateTopic.key));
         REQUIRE(!pobj.as_object()[BinarySensor::Opt::StateTopic.key].as_string().empty());
