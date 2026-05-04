@@ -3,6 +3,7 @@ add_executable(hacpp-integration-tests
   # test_spec_setup.cpp
   client_tests.cpp
   binary_sensor.cpp
+  sensor.cpp
 )
 
 find_package(Boost REQUIRED COMPONENTS log filesystem)
