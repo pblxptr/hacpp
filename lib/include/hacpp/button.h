@@ -42,13 +42,40 @@ namespace hacpp::mqtt {
         {
         }
 
+        const EntityCfg& config() const
+        {
+            return config_.cfg;
+        }
+
+        boost::asio::awaitable<Error> async_update_availability(bool state)
+        {
+            if (!config_.cfg.contains(Availability::Opt::Topic)) {
+                co_return ErrorCode::InvalidConfig;
+            }
+
+            auto val = std::string{};
+            if (state) {
+                val = config_.cfg.contains(Availability::Opt::PayloadAvailable)
+                    ? config_.cfg[Availability::Opt::PayloadAvailable]
+                    : Availability::Defs::PayloadAvailable;
+            } else {
+                val = config_.cfg.contains(Availability::Opt::PayloadNotAvailable)
+                    ? config_.cfg[Availability::Opt::PayloadNotAvailable]
+                    : Availability::Defs::PayloadNotAvailable;
+            }
+
+            co_return co_await client_.async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
+        }
+
         boost::asio::awaitable<Error> async_discovery()
         {
             auto json = config_.cfg.json();
-            auto err = co_await client_.async_subscribe({
-                { config_.cfg[Opt::CommandTopic], config_.qos }
-            });
 
+            auto sub_topics = std::vector<TopicSubopts>{
+                { config_.cfg[Opt::CommandTopic], config_.qos }
+            };
+
+            auto err = co_await client_.async_subscribe(sub_topics);
             if (err) {
                 co_return err;
             }
@@ -84,6 +111,11 @@ namespace hacpp::mqtt {
             co_return ErrorCode::Success;
         }
 
+        boost::asio::awaitable<void> async_close()
+        {
+            co_await client_.async_close();
+        }
+
     private:
         Config config_;
         ClientType client_;
@@ -97,6 +129,13 @@ namespace hacpp::mqtt {
             : unique_id_(unique_id),
               client_(std::move(client))
         {
+        }
+
+        template <typename T, typename V>
+        auto& set(T&& key, V&& value)
+        {
+            cfg_.set(std::forward<T>(key), std::forward<V>(value));
+            return *this;
         }
 
         auto& on_press(Button::Handler handler)

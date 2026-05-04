@@ -4,6 +4,7 @@ add_executable(hacpp-integration-tests
   client_tests.cpp
   binary_sensor.cpp
   sensor.cpp
+  button.cpp
 )
 
 find_package(Boost REQUIRED COMPONENTS log filesystem)
@@ -19,5 +20,10 @@ target_link_libraries(hacpp-integration-tests
     spdlog::spdlog
     hacpp
 )
+
+# target_compile_options(hacpp-integration-tests PRIVATE --coverage)
+# target_link_options(hacpp-integration-tests PRIVATE --coverage)
+
+# add_test(NAME hacpp_integration_tests COMMAND hacpp-integration-tests)
 
 # target_compile_definitions(hacpp-integration-tests PRIVATE ASYNC_MQTT_USE_LOG)
