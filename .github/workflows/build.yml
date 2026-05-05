@@ -1,0 +1,38 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  build:
+    name: Build (${{ matrix.compiler }})
+    runs-on: ${{ matrix.image }}
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+        include:
+          - compiler: gcc
+            image: bicompb/cpp-gcc-13
+          - compiler: clang
+            image: bicompb/cpp-clang-18
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Add conan remote
+        run: conan remote add mygitlab https://gitlab.com/api/v4/projects/75478887/packages/conan || true
+
+      - name: Configure CMake
+        run: cmake --preset linux-native-conan-${{ matrix.compiler }}-debug
+
+      - name: Build
+        run: cmake --build --preset linux-native-conan-${{ matrix.compiler }}-debug
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.compiler }}
+          path: build/

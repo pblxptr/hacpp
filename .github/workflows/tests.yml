@@ -1,0 +1,34 @@
+name: Tests
+
+on:
+  workflow_run:
+    workflows: ["Build"]
+    types:
+      - completed
+
+jobs:
+  tests:
+    name: Tests (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.compiler }}
+          path: build/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Run Integration Tests
+        run: |
+          cd test/integration_tests/env
+          export ARTIFACTS_DIR=${{ github.workspace }}/build/test/integration_tests
+          export CMD_OPTIONS=""
+          docker compose up --build --exit-code-from test test

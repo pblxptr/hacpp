@@ -1,0 +1,34 @@
+name: Quality
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  clang-format:
+    name: Clang Format
+    runs-on: bicompb/cpp-clang-18
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run clang-format
+        run: |
+          find lib test -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) | xargs clang-format --Werror -n
+
+  clang-tidy:
+    name: Clang Tidy
+    runs-on: bicompb/cpp-clang-18
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add conan remote
+        run: conan remote add mygitlab https://gitlab.com/api/v4/projects/75478887/packages/conan || true
+
+      - name: Configure CMake for clang-tidy
+        run: cmake --preset linux-native-conan-clang-debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Run clang-tidy
+        run: |
+          find lib test -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) | xargs clang-tidy -p build/
