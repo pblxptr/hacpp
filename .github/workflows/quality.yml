@@ -9,7 +9,7 @@ on:
 jobs:
   clang-format:
     name: Clang Format
-    runs-on: bicompb/cpp-clang-18
+    runs-on: bicompb/cpp-clang-19
     steps:
       - uses: actions/checkout@v4
 
@@ -19,7 +19,7 @@ jobs:
 
   clang-tidy:
     name: Clang Tidy
-    runs-on: bicompb/cpp-clang-18
+    runs-on: bicompb/cpp-clang-19
     steps:
       - uses: actions/checkout@v4
 
