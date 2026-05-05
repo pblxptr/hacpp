@@ -5,6 +5,7 @@ add_executable(hacpp-integration-tests
   binary_sensor.cpp
   sensor.cpp
   button.cpp
+  cover.cpp
 )
 
 find_package(Boost REQUIRED COMPONENTS log filesystem)
