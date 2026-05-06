@@ -16,15 +16,13 @@ jobs:
         compiler: [gcc, clang]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ matrix.compiler }}
           path: build/
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Run Integration Tests
         run: |

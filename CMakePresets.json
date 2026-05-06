@@ -76,39 +76,5 @@
         "tsan"
       ]
     }
-  ],
-  "buildPresets": [
-    {
-      "name": "linux-native-conan-gcc-debug",
-      "configurePreset": "linux-native-conan-gcc-debug"
-    },
-    {
-      "name": "linux-native-conan-gcc-release",
-      "configurePreset": "linux-native-conan-gcc-release"
-    },
-    {
-      "name": "linux-native-conan-gcc-debug-asan",
-      "configurePreset": "linux-native-conan-gcc-debug-asan"
-    },
-    {
-      "name": "linux-native-conan-gcc-debug-tsan",
-      "configurePreset": "linux-native-conan-gcc-debug-tsan"
-    },
-    {
-      "name": "linux-native-conan-clang-debug",
-      "configurePreset": "linux-native-conan-clang-debug"
-    },
-    {
-      "name": "linux-native-conan-clang-release",
-      "configurePreset": "linux-native-conan-clang-release"
-    },
-    {
-      "name": "linux-native-conan-clang-debug-asan",
-      "configurePreset": "linux-native-conan-clang-debug-asan"
-    },
-    {
-      "name": "linux-native-conan-clang-debug-tsan",
-      "configurePreset": "linux-native-conan-clang-debug-tsan"
-    }
   ]
 }

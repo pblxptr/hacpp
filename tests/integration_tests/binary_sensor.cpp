@@ -51,7 +51,7 @@ TEST_CASE("Binary sensor provides all required options during discovery")
     // Arrange
     auto io = boost::asio::io_context{};
     auto strand = boost::asio::make_strand(io);
-    boost::asio::co_spawn(strand, [&strand]() mutable -> boost::asio::awaitable<void> {
+    boost::asio::co_spawn(strand, [&]() mutable -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         auto binary_sensor = Factory<BinarySensor>(UniqueId, std::move(entity_client))
@@ -81,7 +81,7 @@ TEST_CASE("Binary sensor can update its state")
     auto io = boost::asio::io_context{};
     auto strand = boost::asio::make_strand(io);
 
-    boost::asio::co_spawn(strand, [&strand]() mutable -> boost::asio::awaitable<void> {
+    boost::asio::co_spawn(strand, [&]() mutable -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         auto binary_sensor = Factory<BinarySensor>(UniqueId, std::move(entity_client))
@@ -127,7 +127,7 @@ TEST_CASE("Binary sensor can update its availability")
     auto io = boost::asio::io_context{};
     auto strand = boost::asio::make_strand(io);
 
-    boost::asio::co_spawn(strand, [&strand]() mutable -> boost::asio::awaitable<void> {
+    boost::asio::co_spawn(strand, [&]() mutable -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         auto binary_sensor = Factory<BinarySensor>(UniqueId, std::move(entity_client))

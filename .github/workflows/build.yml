@@ -9,7 +9,10 @@ on:
 jobs:
   build:
     name: Build (${{ matrix.compiler }})
-    runs-on: ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    container:
+        image: ${{matrix.image}}
+        options: --user root
     strategy:
       matrix:
         compiler: [gcc, clang]
@@ -20,7 +23,7 @@ jobs:
             image: bicompb/cpp-clang-19
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Cache Conan packages
         uses: actions/cache@v4
@@ -32,6 +35,9 @@ jobs:
 
       - name: Add conan remote
         run: conan remote add mygitlab https://gitlab.com/api/v4/projects/75478887/packages/conan || true
+
+      - name: 'Detect Conan profile'
+        run: conan profile detect --force
 
       - name: Configure CMake
         run: cmake --preset linux-native-conan-${{ matrix.compiler }}-debug

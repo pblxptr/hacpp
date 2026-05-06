@@ -9,19 +9,27 @@ on:
 jobs:
   clang-format:
     name: Clang Format
-    runs-on: bicompb/cpp-clang-19
+    runs-on: ubuntu-latest
+    container:
+      image: bicompb/cpp-clang-19
+      options: --user root
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Run clang-format
-        run: |
-          find lib test -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) | xargs clang-format --Werror -n
+        run: bash tools/check-clang-format.sh
+
+      - name: Verify clang-format
+        run: bash tools/verify-clang-format.sh
 
   clang-tidy:
     name: Clang Tidy
-    runs-on: bicompb/cpp-clang-19
+    runs-on: ubuntu-latest
+    container:
+      image: bicompb/cpp-clang-19
+      options: --user root
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache Conan packages
         uses: actions/cache@v4
@@ -35,8 +43,14 @@ jobs:
         run: conan remote add mygitlab https://gitlab.com/api/v4/projects/75478887/packages/conan || true
 
       - name: Configure CMake for clang-tidy
-        run: cmake --preset linux-native-conan-clang-debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        run: cmake --preset linux-native-conan-clang-debug
 
       - name: Run clang-tidy
-        run: |
-          find lib test -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) | xargs clang-tidy -p build/
+        working-directory: build
+        shell: bash
+        run: bash ../tools/check-clang-tidy.sh
+
+      - name: Verify clang-tidy
+        working-directory: build
+        shell: bash
+        run: bash ../tools/verify-clang-tidy.sh

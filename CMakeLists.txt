@@ -13,5 +13,5 @@ add_subdirectory(lib)
 
 # if (ENABLE_TESTING)
   enable_testing()
-  add_subdirectory(test)
+  add_subdirectory(tests)
 # endif(ENABLE_TESTING)

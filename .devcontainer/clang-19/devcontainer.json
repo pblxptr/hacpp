@@ -1,6 +1,6 @@
 {
-  "name": "clang-18",
-  "image": "bicompb/cpp-clang-18",
+  "name": "clang-19",
+  "image": "bicompb/cpp-clang-19",
   "mounts": [
     "source=${localEnv:HOME}/.conan2/p,target=/home/vscode/.conan2/p,type=bind"
   ]
