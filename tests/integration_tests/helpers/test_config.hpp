@@ -1,54 +1,50 @@
 #pragma once
 
-#include <unordered_map>
-#include <string_view>
-#include <ranges>
 #include <algorithm>
-#include <string>
-#include <fmt/format.h>
 #include <catch2/catch_all.hpp>
 #include <catch2/catch_session.hpp>
+#include <fmt/format.h>
+#include <ranges>
+#include <string>
+#include <string_view>
+#include <unordered_map>
 
-struct TestOption
-{
+struct TestOption {
   std::string name;
   std::string hint;
   std::string description;
 
-  auto operator<=>(const TestOption&) const = default;
+  auto operator<=>(const TestOption &) const = default;
 };
 
-class TestConfig
-{
+class TestConfig {
   TestConfig() = default;
 
 public:
-  TestConfig(const TestConfig&) = delete;
-  TestConfig& operator=(const TestConfig&) = delete;
-  TestConfig(TestConfig&&) = delete;
-  TestConfig& operator=(TestConfig&&) = delete;
+  TestConfig(const TestConfig &) = delete;
+  TestConfig &operator=(const TestConfig &) = delete;
+  TestConfig(TestConfig &&) = delete;
+  TestConfig &operator=(TestConfig &&) = delete;
 
 public:
-  static auto& get()
-  {
+  static auto &get() {
     static TestConfig instance;
 
     return instance;
   }
 
-  void add_option(const TestOption& option)
-  {
-    if (std::ranges::count_if(options_, [&option](auto&& opt) {
+  void add_option(const TestOption &option) {
+    if (std::ranges::count_if(options_, [&option](auto &&opt) {
           return option.name == opt.name;
         })) {
-      throw std::runtime_error(fmt::format("Option: {} already exists", option.name));
+      throw std::runtime_error(
+          fmt::format("Option: {} already exists", option.name));
     }
 
     options_.push_back(option);
   }
 
-  std::optional<std::string> option_value(std::string_view option_name) const
-  {
+  std::optional<std::string> option_value(std::string_view option_name) const {
     if (not options_placeholders_.contains(option_name.data())) {
       return std::nullopt;
     }
@@ -62,15 +58,14 @@ public:
     return option;
   }
 
-  template<class Session>
-  void apply(Session& session)
-  {
+  template <class Session> void apply(Session &session) {
     using namespace Catch::Clara;
 
     auto cli = session.cli();
 
-    for (auto& option : options_) {
-      cli |= Opt(options_placeholders_[option.name], option.hint)[option.name](option.description);
+    for (auto &option : options_) {
+      cli |= Opt(options_placeholders_[option.name],
+                 option.hint)[option.name](option.description);
     }
     session.cli(cli);
   }
