@@ -6,7 +6,7 @@ services:
     network_mode: host
   test:
     depends_on: [ mqtt_broker ]
-    image: ubuntu:22.04
+    image: ubuntu:latest
     command: >
         bash -c "chmod +x /home/bin/hacpp-integration-tests &&
         /home/bin/hacpp-integration-tests ${CMD_OPTIONS}

@@ -6,27 +6,40 @@ on:
     types:
       - completed
 
+permissions:
+  actions: read
+  contents: read
+
 jobs:
   tests:
-    name: Tests (${{ matrix.compiler }})
+    name: Tests (${{ matrix.preset }})
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     strategy:
+      fail-fast: false
       matrix:
-        compiler: [gcc, clang]
+        preset:
+          - linux-native-conan-gcc-debug
+          - linux-native-conan-gcc-release
+          - linux-native-conan-clang-debug
+          - linux-native-conan-clang-release
+          - linux-native-conan-gcc-debug-asan
+          - linux-native-conan-gcc-debug-tsan
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          name: build-artifacts-${{ matrix.compiler }}
+          name: build-artifacts-${{ matrix.preset }}
           path: build/
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Integration Tests
         run: |
-          cd test/integration_tests/env
-          export ARTIFACTS_DIR=${{ github.workspace }}/build/test/integration_tests
+          cd tests/integration_tests/env
+          export ARTIFACTS_DIR=${{ github.workspace }}/build/
           export CMD_OPTIONS=""
-          docker compose up --build --exit-code-from test test
+          docker compose up --build --force-recreate --exit-code-from test test

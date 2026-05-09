@@ -8,30 +8,38 @@ on:
 
 jobs:
   build:
-    name: Build (${{ matrix.compiler }})
+    name: ${{ matrix.preset }}
     runs-on: ubuntu-latest
     container:
-        image: ${{matrix.image}}
-        options: --user root
+      image: ${{ matrix.image }}
+      options: --user root
     strategy:
+      fail-fast: false
       matrix:
-        compiler: [gcc, clang]
         include:
-          - compiler: gcc
+          - preset: linux-native-conan-gcc-debug
             image: bicompb/cpp-gcc-13
-          - compiler: clang
+          - preset: linux-native-conan-gcc-release
+            image: bicompb/cpp-gcc-13
+          - preset: linux-native-conan-clang-debug
             image: bicompb/cpp-clang-19
+          - preset: linux-native-conan-clang-release
+            image: bicompb/cpp-clang-19
+          - preset: linux-native-conan-gcc-debug-asan
+            image: bicompb/cpp-gcc-13
+          - preset: linux-native-conan-gcc-debug-tsan
+            image: bicompb/cpp-gcc-13
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
       - name: Cache Conan packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.conan2/p
-          key: conan-${{ matrix.compiler }}-${{ hashFiles('conanfile.txt') }}
+          key: conan-${{ matrix.preset }}-${{ hashFiles('conanfile.txt') }}
           restore-keys: |
-            conan-${{ matrix.compiler }}-
+            conan-${{ matrix.preset }}-
 
       - name: Add conan remote
         run: conan remote add mygitlab https://gitlab.com/api/v4/projects/75478887/packages/conan || true
@@ -39,14 +47,15 @@ jobs:
       - name: 'Detect Conan profile'
         run: conan profile detect --force
 
-      - name: Configure CMake
-        run: cmake --preset linux-native-conan-${{ matrix.compiler }}-debug
-
       - name: Build
-        run: cmake --build --preset linux-native-conan-${{ matrix.compiler }}-debug
+        run: |
+          BUILD_DIR="cmake-build-${{ matrix.preset }}-${{ github.sha }}"
+          mkdir -p "$BUILD_DIR"
+          cmake --preset ${{ matrix.preset }} -B "$BUILD_DIR"
+          cmake --build "$BUILD_DIR"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: build-artifacts-${{ matrix.compiler }}
-          path: build/
+          name: build-artifacts-${{ matrix.preset }}
+          path: cmake-build-${{ matrix.preset }}-${{ github.sha }}/bin
