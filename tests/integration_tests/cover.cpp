@@ -49,7 +49,7 @@ boost::asio::awaitable<T> async_recv_packet(ClientType &client) {
   co_return *packet;
 }
 
-TEST_CASE("Cover provides all required options during discovery") {
+TEST_CASE("Cover provides all required options during discovery", "[cover]") {
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
@@ -85,7 +85,7 @@ TEST_CASE("Cover provides all required options during discovery") {
   io.run();
 }
 
-TEST_CASE("Cover can receive commands") {
+TEST_CASE("Cover can receive commands", "[cover]") {
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
@@ -171,7 +171,7 @@ TEST_CASE("Cover can receive commands") {
   io.run();
 }
 
-TEST_CASE("Cover state update") {
+TEST_CASE("Cover state update", "[cover]") {
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);

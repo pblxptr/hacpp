@@ -47,7 +47,7 @@ boost::asio::awaitable<T> async_recv_packet(ClientType &client) {
   co_return *packet;
 }
 
-TEST_CASE("Sensor provides all required options during discovery") {
+TEST_CASE("Sensor provides all required options during discovery", "[sensor]") {
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
@@ -82,7 +82,7 @@ TEST_CASE("Sensor provides all required options during discovery") {
   io.run();
 }
 
-TEST_CASE("Sensor can update its state") {
+TEST_CASE("Sensor can update its state", "[sensor]") {
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
@@ -119,7 +119,7 @@ TEST_CASE("Sensor can update its state") {
   io.run();
 }
 
-TEST_CASE("Sensor availability") {
+TEST_CASE("Sensor availability", "[sensor]") {
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);

@@ -47,7 +47,7 @@ boost::asio::awaitable<T> async_recv_packet(ClientType &client) {
   co_return *packet;
 }
 
-TEST_CASE("Button provides all required options during discovery") {
+TEST_CASE("Button provides all required options during discovery", "[button]") {
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
@@ -82,10 +82,11 @@ TEST_CASE("Button provides all required options during discovery") {
   io.run();
 }
 
-TEST_CASE("Button can receive press command") {
+TEST_CASE("Button can receive press command", "[button]") {
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
+  auto button = std::shared_ptr<Button>{};
 
   boost::asio::co_spawn(
       strand,
@@ -94,23 +95,22 @@ TEST_CASE("Button can receive press command") {
         auto verifier_client = co_await get_verifier(strand);
         bool pressed = false;
         // clang-format off
-        auto button = Factory<Button>(UniqueId, std::move(entity_client))
+        button = std::make_shared<Button>(Factory<Button>(UniqueId, std::move(entity_client))
                 .on_press([&pressed]() -> boost::asio::awaitable<void> {
                   pressed = true;
                   co_return;
                 })
-                .create();
+                .create());
         // clang-format on
-        auto err_disc = co_await button.async_discovery();
+        auto err_disc = co_await button->async_discovery();
         REQUIRE(!err_disc);
-        auto packet_disc =
-            co_await async_recv_packet<PublishPacket>(verifier_client);
+        auto packet_disc = co_await async_recv_packet<PublishPacket>(verifier_client);
 
         // Start button loop in background
         boost::asio::co_spawn(
             strand,
             [&]() -> boost::asio::awaitable<void> {
-              co_await button.async_run();
+              co_await button->async_run();
             },
             rethrow);
 
@@ -128,7 +128,7 @@ TEST_CASE("Button can receive press command") {
         // Assert
         REQUIRE(pressed);
 
-        co_await button.async_close();
+        co_await button->async_close();
         co_await verifier_client.async_close();
       },
       rethrow);
@@ -136,7 +136,7 @@ TEST_CASE("Button can receive press command") {
   io.run();
 }
 
-TEST_CASE("Button availability") {
+TEST_CASE("Button availability", "[button]") {
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);

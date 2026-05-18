@@ -38,6 +38,14 @@ class AsyncMqttClient2 {
   using Impl = async_mqtt::client<async_mqtt::protocol_version::v5,
                                   async_mqtt::protocol::mqtt>;
 
+  enum class State { Closed, Connected, Reconnecting };
+
+  struct Connection {
+    State state { State::Closed };
+    int attempt = 0;
+    int max_attempts = 10;
+  };
+
 public:
   struct Config {
     std::string host{"localhost"};
@@ -54,7 +62,8 @@ public:
 
   auto executor() { return impl_.get_executor(); }
 
-  boost::asio::awaitable<Error> async_connect() {
+  boost::asio::awaitable<Error> async_connect()
+  {
     auto err = Error{};
     co_await impl_.async_underlying_handshake(
         config_.host, config_.port,
@@ -75,6 +84,9 @@ public:
       co_return map_err(err);
     }
 
+    conn_.state = State::Connected;
+    conn_.attempt = 0;
+
     spdlog::debug("Connected successfully, connack: {}",
                   detail::str(connack_packet));
 
@@ -85,6 +97,9 @@ public:
     auto err = Error{};
     co_await impl_.async_disconnect(
         boost::asio::redirect_error(boost::asio::use_awaitable, err));
+
+    conn_.state = State::Closed;
+
     co_return map_err(err);
   }
 
@@ -92,14 +107,23 @@ public:
     auto err = Error{};
     co_await impl_.async_close(
         boost::asio::redirect_error(boost::asio::use_awaitable, err));
+
+    // TODO: Consider calling disconnect first
+    conn_.state = State::Closed;
+
     co_return map_err(err);
   }
 
   boost::asio::awaitable<Error>
   async_publish(const std::string &topic, const std::string &payload,
-                async_mqtt::qos qos = async_mqtt::qos::at_most_once) {
+                async_mqtt::qos qos = async_mqtt::qos::at_most_once)
+  {
     spdlog::debug("Publishing to topic: {}, payload: {}, QoS: {}", topic,
                   payload, static_cast<int>(qos));
+
+    if (conn_.state != State::Connected) {
+      co_return ErrorCode::NotConnected;
+    }
 
     auto err = Error{};
     auto pid = qos > QoS::at_most_once
@@ -131,7 +155,12 @@ public:
   }
 
   boost::asio::awaitable<Error>
-  async_subscribe(const std::vector<TopicSubopts> &sub_entry) {
+  async_subscribe(const std::vector<TopicSubopts> &sub_entry)
+  {
+    if (conn_.state != State::Connected) {
+      co_return ErrorCode::NotConnected;
+    }
+
     auto err = Error{};
     auto pid_sub = co_await impl_.async_acquire_unique_packet_id();
     auto suback_opt = co_await impl_.async_subscribe(
@@ -149,15 +178,20 @@ public:
     co_return ErrorCode::Success;
   }
 
-  boost::asio::awaitable<RecvResult> async_recv() {
+  boost::asio::awaitable<RecvResult> async_recv()
+  {
     auto err = Error{};
     auto packet = co_await impl_.async_recv(
         boost::asio::redirect_error(boost::asio::use_awaitable, err));
 
     if (err) {
-      spdlog::error("Receive error: {}", err.message());
+      auto err_rc = co_await async_handle_reconnect();
+      co_return std::unexpected(err_rc);
+    }
+    if (err) {
       co_return std::unexpected(map_err(err));
     }
+
 
     packet->visit(
         [](auto &&p) { spdlog::debug("Received packet: {}", detail::str(p)); });
@@ -166,8 +200,45 @@ public:
   }
 
 private:
+  boost::asio::awaitable<Error> async_handle_reconnect()
+  {
+    if (conn_.state == State::Closed) {
+      co_return ErrorCode::Disconnected;
+    }
+    // TODO: Disable reconnection when user expliclity calls close/disconnect
+
+    const auto base_delay = std::chrono::seconds{1};
+    auto timer = boost::asio::steady_timer{executor()};
+
+    if (conn_.attempt >= conn_.max_attempts) {
+      co_return ErrorCode::Disconnected;
+    }
+
+    conn_.state = State::Reconnecting;
+
+    auto err = Error{};
+    while (conn_.attempt++ < conn_.max_attempts) {
+      spdlog::debug("Reconnecting, attempt: {}/{}", conn_.attempt,
+                    conn_.max_attempts);
+
+      // timer.expires_after(std::chrono::seconds{base_delay.count() * std::pow(2, conn_.attempt - 1)});
+      timer.expires_after(std::chrono::seconds{base_delay.count() * static_cast<int>(std::pow(2, conn_.attempt - 1))});
+      co_await timer.async_wait(boost::asio::use_awaitable);
+
+      err = co_await async_connect();
+      if (!err) {
+        co_return ErrorCode::Reconnected;
+      }
+
+      spdlog::debug("Reconnecting failed: {}", err.message());
+    }
+    co_return err;
+  }
+
+private:
   Impl impl_;
   Config config_;
+  Connection conn_;
 };
 
 using ClientType = AsyncMqttClient2;

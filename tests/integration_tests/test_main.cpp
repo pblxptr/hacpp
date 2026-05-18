@@ -1,5 +1,6 @@
 #include <async_mqtt/all.hpp>
 #include <catch2/catch_session.hpp>
+#include <spdlog/spdlog.h>
 
 // #include "helpers/test_setup.hpp"
 // #include "helpers/test_config.hpp"
@@ -17,6 +18,8 @@ int main(int argc, char *argv[]) {
   // auto& config = TestConfig::get();
   // test_spec_setup();
   // config.apply(session);
+
+  spdlog::set_level(spdlog::level::debug);
 
   int returnCode = session.applyCommandLine(argc, argv);
   if (returnCode != 0) // Indicates a command line error

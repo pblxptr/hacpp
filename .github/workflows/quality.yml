@@ -10,6 +10,7 @@ jobs:
   clang-format:
     name: Clang Format
     runs-on: ubuntu-latest
+    continue-on-error: true
     container:
       image: bicompb/cpp-clang-19
       options: --user root

@@ -113,7 +113,7 @@ TEST_CASE("Client is not operational when disconnected") {
 
           // Assert
           REQUIRE(err);
-          REQUIRE(err == ErrorCode::PacketNotAllowedToSend);
+          REQUIRE(err == ErrorCode::NotConnected);
           co_await client.async_close();
         },
         rethrow);
@@ -130,11 +130,116 @@ TEST_CASE("Client is not operational when disconnected") {
 
           // Assert
           REQUIRE(err);
-          REQUIRE(err == ErrorCode::PacketNotAllowedToSend);
+          REQUIRE(err == ErrorCode::NotConnected);
           co_await client.async_close();
         },
         rethrow);
   }
 
   io.run();
+}
+
+#include <filesystem>
+
+// Helper to run proxy commands
+void run_proxy(const std::string& cmd) {
+    std::string path = "/home/env/manage_proxy.py";
+
+    if (!std::filesystem::exists(path)) {
+        path = std::string(INTEGRATION_TEST_ENV_DIR) + "/manage_proxy.py";
+    }
+
+    spdlog::debug("Running proxy command: '{}' using script: {}", cmd, path);
+
+    auto full_cmd = "python3 " + path + " " + cmd;
+    int res = std::system(full_cmd.c_str());
+
+    if (res != 0) {
+        spdlog::error("Failed to run proxy command: {} (exit code: {})", full_cmd, res);
+
+        // Diagnostic: Check if python3 actually exists in a common location
+        if (std::filesystem::exists("/usr/bin/python3")) {
+            spdlog::info("/usr/bin/python3 exists. Attempting with absolute path...");
+            full_cmd = "/usr/bin/python3 " + path + " " + cmd;
+            res = std::system(full_cmd.c_str());
+            if (res == 0) return;
+        } else {
+            spdlog::error("/usr/bin/python3 DOES NOT EXIST in the container!");
+        }
+    }
+}
+
+TEST_CASE("Client can autoreconnect", "[autoreconnect]")
+{
+  // Arrange
+  auto io = boost::asio::io_context{};
+  auto strand = boost::asio::make_strand(io);
+
+  auto proxy_config = config;
+  proxy_config.port = "1884";
+  auto client = std::make_shared<hacpp::mqtt::AsyncMqttClient2>(strand, proxy_config);
+
+  run_proxy("setup");
+  run_proxy("reconnect");
+
+  bool reconnected_signaled = false;
+
+  // NOLINTBEGIN
+  boost::asio::co_spawn(
+    strand,
+    [&, client]() -> boost::asio::awaitable<void> {
+      auto err = co_await client->async_connect();
+      REQUIRE(!err);
+
+      while (true) {
+        auto res = co_await client->async_recv();
+        if (!res) {
+          spdlog::info("Recv error in test: {}", res.error().message());
+          if (res.error() == ErrorCode::Reconnected) {
+            reconnected_signaled = true;
+            break;
+          }
+          if (res.error() == ErrorCode::Disconnected) {
+            break;
+          }
+        }
+      }
+      co_await client->async_close();
+    },
+    rethrow);
+
+  boost::asio::co_spawn(
+    strand,
+    [&]() -> boost::asio::awaitable<void> {
+      boost::asio::steady_timer timer{strand};
+
+      timer.expires_after(std::chrono::milliseconds(500));
+      co_await timer.async_wait(boost::asio::use_awaitable);
+
+      spdlog::info("TEST: Disconnecting proxy...");
+      run_proxy("disconnect");
+
+      timer.expires_after(std::chrono::seconds(2));
+      co_await timer.async_wait(boost::asio::use_awaitable);
+
+      spdlog::info("TEST: Reconnecting proxy...");
+      run_proxy("reconnect");
+    },
+    rethrow);
+
+  // Global timeout for the test to prevent hanging
+  boost::asio::co_spawn(
+    strand,
+    [&]() -> boost::asio::awaitable<void> {
+      boost::asio::steady_timer timer{strand};
+      timer.expires_after(std::chrono::seconds(15));
+      co_await timer.async_wait(boost::asio::use_awaitable);
+      io.stop();
+    },
+    rethrow);
+  // NOLINTEND
+
+  io.run();
+
+  CHECK(reconnected_signaled);
 }
