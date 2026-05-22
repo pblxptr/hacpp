@@ -15,6 +15,8 @@ enum class ErrorCode {
   PacketNotAllowedToSend, // TODO: Perhaps too specific?
   NotConnected,
   InvalidConfig,
+  Disconnected,
+  Reconnected,
   UnknownError
 };
 
@@ -51,6 +53,10 @@ public:
       return "not_connected";
     case ErrorCode::InvalidConfig:
       return "invalid_config";
+    case ErrorCode::Disconnected:
+      return "disconnected";
+    case ErrorCode::Reconnected:
+      return "reconnected";
     case ErrorCode::UnknownError:
       return "unknown_error";
     default:
@@ -88,6 +94,15 @@ inline ErrorCode map_netdb_error(int ev) {
   }
 }
 
+inline ErrorCode map_misc_error(int ev) {
+  switch (ev) {
+  case boost::asio::error::eof:
+    return ErrorCode::Disconnected;
+  default:
+    return ErrorCode::UnknownError;
+  }
+}
+
 inline ErrorCode map_system_error(int ev) {
   switch (ev) {
   case boost::asio::error::connection_refused:
@@ -120,6 +135,10 @@ inline boost::system::error_code map_err(const boost::system::error_code &ec) {
 
   if (ec.category() == boost::asio::error::get_netdb_category()) {
     return detail::map_netdb_error(ec.value());
+  }
+
+  if (ec.category() == boost::asio::error::get_misc_category()) {
+    return detail::map_misc_error(ec.value());
   }
 
   if (ec.category() == boost::asio::error::get_system_category()) {

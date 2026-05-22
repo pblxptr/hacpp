@@ -49,7 +49,7 @@ boost::asio::awaitable<T> async_recv_packet(ClientType &client) {
   co_return *packet;
 }
 
-TEST_CASE("Binary sensor provides all required options during discovery") {
+TEST_CASE("Binary sensor provides all required options during discovery", "[binary_sensor]") {
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
@@ -87,7 +87,7 @@ TEST_CASE("Binary sensor provides all required options during discovery") {
   io.run();
 }
 
-TEST_CASE("Binary sensor can update its state") {
+TEST_CASE("Binary sensor can update its state", "[binary_sensor]") {
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
@@ -144,7 +144,7 @@ TEST_CASE("Binary sensor can update its state") {
   io.run();
 }
 
-TEST_CASE("Binary sensor can update its availability") {
+TEST_CASE("Binary sensor can update its availability", "[binary_sensor]") {
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
