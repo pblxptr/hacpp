@@ -1,13 +1,14 @@
+#include "config.h"
+
 #include <hacpp/async_mqtt_client.h>
 
 #include <catch2/catch_all.hpp>
 
-#include "config.h"
-
 using hacpp::mqtt::Error;
 using hacpp::mqtt::ErrorCode;
 
-TEST_CASE("Client can connect to broker") {
+TEST_CASE("Client can connect to broker")
+{
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
@@ -30,11 +31,13 @@ TEST_CASE("Client can connect to broker") {
   io.run();
 }
 
-TEST_CASE("Client cannot connect to broker") {
+TEST_CASE("Client cannot connect to broker")
+{
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
-  SECTION("when providing invalid credentials") {
+  SECTION("when providing invalid credentials")
+  {
     // Arrange
     auto invalid_config = config;
     invalid_config.password = "invalid_password";
@@ -55,7 +58,8 @@ TEST_CASE("Client cannot connect to broker") {
     // NOLINTEND
   }
 
-  SECTION("when host is unavailable") {
+  SECTION("when host is unavailable")
+  {
     // Arrange
     auto unavailable_config = config;
     unavailable_config.host = "invalid_host";
@@ -76,7 +80,8 @@ TEST_CASE("Client cannot connect to broker") {
     // NOLINTEND
   }
 
-  SECTION("when port is unavailable") {
+  SECTION("when port is unavailable")
+  {
     // Arrange
     auto unavailable_config = config;
     unavailable_config.port = "9999";
@@ -98,13 +103,15 @@ TEST_CASE("Client cannot connect to broker") {
   }
 }
 
-TEST_CASE("Client is not operational when disconnected") {
+TEST_CASE("Client is not operational when disconnected")
+{
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
   auto client = hacpp::mqtt::AsyncMqttClient2{strand, config};
 
-  SECTION("cannot publish") {
+  SECTION("cannot publish")
+  {
     boost::asio::co_spawn(
         strand,
         [client = std::move(client)]() mutable -> boost::asio::awaitable<void> {
@@ -119,13 +126,15 @@ TEST_CASE("Client is not operational when disconnected") {
         rethrow);
   }
 
-  SECTION("cannot subscribe") {
+  SECTION("cannot subscribe")
+  {
     boost::asio::co_spawn(
         strand,
         [client = std::move(client)]() mutable -> boost::asio::awaitable<void> {
           // Act
           auto topics = std::vector<hacpp::mqtt::TopicSubopts>{
-              {"test/topic", async_mqtt::qos::at_most_once}};
+              {"test/topic", async_mqtt::qos::at_most_once}
+          };
           auto err = co_await client.async_subscribe(topics);
 
           // Assert
@@ -142,31 +151,34 @@ TEST_CASE("Client is not operational when disconnected") {
 #include <filesystem>
 
 // Helper to run proxy commands
-void run_proxy(const std::string& cmd) {
-    std::string path = "/home/env/manage_proxy.py";
+void run_proxy(const std::string& cmd)
+{
+  std::string path = "/home/env/manage_proxy.py";
 
-    if (!std::filesystem::exists(path)) {
-        path = std::string(INTEGRATION_TEST_ENV_DIR) + "/manage_proxy.py";
+  if (!std::filesystem::exists(path)) {
+    path = std::string(INTEGRATION_TEST_ENV_DIR) + "/manage_proxy.py";
+  }
+
+  spdlog::debug("Running proxy command: '{}' using script: {}", cmd, path);
+
+  auto full_cmd = "python3 " + path + " " + cmd;
+  int res = std::system(full_cmd.c_str());
+
+  if (res != 0) {
+    spdlog::error("Failed to run proxy command: {} (exit code: {})", full_cmd, res);
+
+    // Diagnostic: Check if python3 actually exists in a common location
+    if (std::filesystem::exists("/usr/bin/python3")) {
+      spdlog::info("/usr/bin/python3 exists. Attempting with absolute path...");
+      full_cmd = "/usr/bin/python3 " + path + " " + cmd;
+      res = std::system(full_cmd.c_str());
+      if (res == 0) {
+        return;
+      }
+    } else {
+      spdlog::error("/usr/bin/python3 DOES NOT EXIST in the container!");
     }
-
-    spdlog::debug("Running proxy command: '{}' using script: {}", cmd, path);
-
-    auto full_cmd = "python3 " + path + " " + cmd;
-    int res = std::system(full_cmd.c_str());
-
-    if (res != 0) {
-        spdlog::error("Failed to run proxy command: {} (exit code: {})", full_cmd, res);
-
-        // Diagnostic: Check if python3 actually exists in a common location
-        if (std::filesystem::exists("/usr/bin/python3")) {
-            spdlog::info("/usr/bin/python3 exists. Attempting with absolute path...");
-            full_cmd = "/usr/bin/python3 " + path + " " + cmd;
-            res = std::system(full_cmd.c_str());
-            if (res == 0) return;
-        } else {
-            spdlog::error("/usr/bin/python3 DOES NOT EXIST in the container!");
-        }
-    }
+  }
 }
 
 TEST_CASE("Client can autoreconnect", "[autoreconnect]")
@@ -186,57 +198,57 @@ TEST_CASE("Client can autoreconnect", "[autoreconnect]")
 
   // NOLINTBEGIN
   boost::asio::co_spawn(
-    strand,
-    [&, client]() -> boost::asio::awaitable<void> {
-      auto err = co_await client->async_connect();
-      REQUIRE(!err);
+      strand,
+      [&, client]() -> boost::asio::awaitable<void> {
+        auto err = co_await client->async_connect();
+        REQUIRE(!err);
 
-      while (true) {
-        auto res = co_await client->async_recv();
-        if (!res) {
-          spdlog::info("Recv error in test: {}", res.error().message());
-          if (res.error() == ErrorCode::Reconnected) {
-            reconnected_signaled = true;
-            break;
-          }
-          if (res.error() == ErrorCode::Disconnected) {
-            break;
+        while (true) {
+          auto res = co_await client->async_recv();
+          if (!res) {
+            spdlog::info("Recv error in test: {}", res.error().message());
+            if (res.error() == ErrorCode::Reconnected) {
+              reconnected_signaled = true;
+              break;
+            }
+            if (res.error() == ErrorCode::Disconnected) {
+              break;
+            }
           }
         }
-      }
-      co_await client->async_close();
-    },
-    rethrow);
+        co_await client->async_close();
+      },
+      rethrow);
 
   boost::asio::co_spawn(
-    strand,
-    [&]() -> boost::asio::awaitable<void> {
-      boost::asio::steady_timer timer{strand};
+      strand,
+      [&]() -> boost::asio::awaitable<void> {
+        boost::asio::steady_timer timer{strand};
 
-      timer.expires_after(std::chrono::milliseconds(500));
-      co_await timer.async_wait(boost::asio::use_awaitable);
+        timer.expires_after(std::chrono::milliseconds(500));
+        co_await timer.async_wait(boost::asio::use_awaitable);
 
-      spdlog::info("TEST: Disconnecting proxy...");
-      run_proxy("disconnect");
+        spdlog::info("TEST: Disconnecting proxy...");
+        run_proxy("disconnect");
 
-      timer.expires_after(std::chrono::seconds(2));
-      co_await timer.async_wait(boost::asio::use_awaitable);
+        timer.expires_after(std::chrono::seconds(2));
+        co_await timer.async_wait(boost::asio::use_awaitable);
 
-      spdlog::info("TEST: Reconnecting proxy...");
-      run_proxy("reconnect");
-    },
-    rethrow);
+        spdlog::info("TEST: Reconnecting proxy...");
+        run_proxy("reconnect");
+      },
+      rethrow);
 
   // Global timeout for the test to prevent hanging
   boost::asio::co_spawn(
-    strand,
-    [&]() -> boost::asio::awaitable<void> {
-      boost::asio::steady_timer timer{strand};
-      timer.expires_after(std::chrono::seconds(15));
-      co_await timer.async_wait(boost::asio::use_awaitable);
-      io.stop();
-    },
-    rethrow);
+      strand,
+      [&]() -> boost::asio::awaitable<void> {
+        boost::asio::steady_timer timer{strand};
+        timer.expires_after(std::chrono::seconds(15));
+        co_await timer.async_wait(boost::asio::use_awaitable);
+        io.stop();
+      },
+      rethrow);
   // NOLINTEND
 
   io.run();
