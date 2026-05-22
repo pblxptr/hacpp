@@ -5,15 +5,23 @@ services:
       context: .
     network_mode: host
   test:
-    depends_on: [ mqtt_broker ]
-    image: ubuntu:latest
+    depends_on: [ mqtt_broker, toxiproxy ]
+    build:
+      context: .
+      dockerfile: test.dockerfile
     command: >
         bash -c "chmod +x /home/bin/hacpp-integration-tests &&
         /home/bin/hacpp-integration-tests ${CMD_OPTIONS}
         "
     volumes:
       - ${ARTIFACTS_DIR}:/home/bin
+      - .:/home/env
     network_mode: host
+
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:latest
+    network_mode: host
+    command: -host 0.0.0.0
 
   mqtt_explorer:
     depends_on: [ mqtt_broker ]
