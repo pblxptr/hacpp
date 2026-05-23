@@ -5,13 +5,14 @@
 #pragma once
 
 #include "test_config.hpp"
+
+#include <hacpp/mqtt/async_mqtt_client.hpp>
+
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/redirect_error.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/use_awaitable.hpp>
-
-#include <hacpp/mqtt/async_mqtt_client.hpp>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 constexpr auto MqttServerAddressOptionName = "--tp_mqtt_server_address";
@@ -33,16 +34,22 @@ constexpr auto LocalMqttServerPort = "1883";
 constexpr auto LocalUsername = "test_user";
 constexpr auto LocalPassword = "test";
 
-inline auto rethrow(const std::exception_ptr &eptr) {
+inline auto rethrow(const std::exception_ptr& eptr)
+{
   if (eptr) {
     std::rethrow_exception(eptr);
   }
 }
 
-struct IoContext {
-  void stop() { ioc_.stop(); }
+struct IoContext
+{
+  void stop()
+  {
+    ioc_.stop();
+  }
 
-  void run(std::chrono::seconds timeout = std::chrono::seconds{30}) {
+  void run(std::chrono::seconds timeout = std::chrono::seconds{30})
+  {
     //    // NOLINTBEGIN
     boost::asio::co_spawn(
         ioc_,
@@ -52,8 +59,7 @@ struct IoContext {
 
           auto ec = boost::system::error_code{};
 
-          co_await timer.async_wait(
-              boost::asio::redirect_error(boost::asio::use_awaitable, ec));
+          co_await timer.async_wait(boost::asio::redirect_error(boost::asio::use_awaitable, ec));
           if (!ec) {
             WARN("Test timeout!");
             REQUIRE(false);
@@ -66,88 +72,88 @@ struct IoContext {
     ioc_.run();
   }
 
-  boost::asio::io_context &handle() { return ioc_; }
+  boost::asio::io_context& handle()
+  {
+    return ioc_;
+  }
 
   boost::asio::io_context ioc_{};
-  boost::asio::executor_work_guard<decltype(ioc_.get_executor())> work{
-      ioc_.get_executor()};
+  boost::asio::executor_work_guard<decltype(ioc_.get_executor())> work{ioc_.get_executor()};
 };
 
-inline auto default_config() {
-  return hacpp::ClientConfig{.unique_id = DefaultUniqueId,
-                             .username = DefaultUsername,
-                             .password = DefaultPassword,
-                             .host = DefaultMqttServerAddress,
-                             .port = DefaultMqttServerPort};
+inline auto default_config()
+{
+  return hacpp::ClientConfig{
+      .unique_id = DefaultUniqueId,
+      .username = DefaultUsername,
+      .password = DefaultPassword,
+      .host = DefaultMqttServerAddress,
+      .port = DefaultMqttServerPort};
 }
 
-inline auto local_config() {
-  return hacpp::ClientConfig{.unique_id = DefaultUniqueId,
-                             .username = LocalUsername,
-                             .password = LocalPassword,
-                             .host = LocalMqttServerAddress,
-                             .port = LocalMqttServerPort,
-                             .keep_alive = 0x1234,
-                             .max_attempts = 0};
+inline auto local_config()
+{
+  return hacpp::ClientConfig{
+      .unique_id = DefaultUniqueId,
+      .username = LocalUsername,
+      .password = LocalPassword,
+      .host = LocalMqttServerAddress,
+      .port = LocalMqttServerPort,
+      .keep_alive = 0x1234,
+      .max_attempts = 0};
 }
 
-inline auto config_from_options() {
-  auto unique_id = TestConfig::get()
-                       .option_value(MqttUniqueIdOptionName)
-                       .value_or(DefaultUniqueId);
-  auto username = TestConfig::get()
-                      .option_value(MqttUsernameOptionName)
-                      .value_or(DefaultUsername);
-  auto password = TestConfig::get()
-                      .option_value(MqttPasswordOptionName)
-                      .value_or(DefaultPassword);
-  auto server_address = TestConfig::get()
-                            .option_value(MqttServerAddressOptionName)
-                            .value_or(DefaultMqttServerAddress);
-  auto server_port = TestConfig::get()
-                         .option_value(DefaultMqttServerPort)
-                         .value_or(DefaultMqttServerPort);
+inline auto config_from_options()
+{
+  auto unique_id = TestConfig::get().option_value(MqttUniqueIdOptionName).value_or(DefaultUniqueId);
+  auto username = TestConfig::get().option_value(MqttUsernameOptionName).value_or(DefaultUsername);
+  auto password = TestConfig::get().option_value(MqttPasswordOptionName).value_or(DefaultPassword);
+  auto server_address = TestConfig::get().option_value(MqttServerAddressOptionName).value_or(DefaultMqttServerAddress);
+  auto server_port = TestConfig::get().option_value(DefaultMqttServerPort).value_or(DefaultMqttServerPort);
 
-  return hacpp::ClientConfig{.unique_id = unique_id,
-                             .username = username,
-                             .password = password,
-                             .host = server_address,
-                             .port = server_port,
-                             .clean_session = true,
-                             .keep_alive = DefaultKeepAlive,
-                             .max_attempts = 0};
+  return hacpp::ClientConfig{
+      .unique_id = unique_id,
+      .username = username,
+      .password = password,
+      .host = server_address,
+      .port = server_port,
+      .clean_session = true,
+      .keep_alive = DefaultKeepAlive,
+      .max_attempts = 0};
 }
 
-inline auto get_config() { return local_config(); }
+inline auto get_config()
+{
+  return local_config();
+}
 
-inline auto setup_logger(const std::string &logger_name,
-                         spdlog::level::level_enum level) {
+inline auto setup_logger(const std::string& logger_name, spdlog::level::level_enum level)
+{
   // Console sink
   auto sinks = std::vector<spdlog::sink_ptr>{};
   auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
   console_sink->set_level(level);
   sinks.push_back(console_sink);
 
-  auto logger =
-      std::make_shared<spdlog::logger>(logger_name, sinks.begin(), sinks.end());
+  auto logger = std::make_shared<spdlog::logger>(logger_name, sinks.begin(), sinks.end());
   logger->set_level(spdlog::level::trace);
   spdlog::register_logger(logger);
 }
 
 template <typename T>
-boost::asio::awaitable<hacpp::PublishPacket_t>
-async_get_publish_packet(T &client) {
-  const auto &result = co_await client.async_receive();
+boost::asio::awaitable<hacpp::PublishPacket_t> async_get_publish_packet(T& client)
+{
+  const auto& result = co_await client.async_receive();
   REQUIRE(result);
-  const auto &value = result.value();
+  const auto& value = result.value();
   REQUIRE(std::holds_alternative<hacpp::PublishPacket_t>(value));
 
   co_return std::get<hacpp::PublishPacket_t>(value);
 }
 
 template <typename T>
-boost::asio::awaitable<void> async_subscribe(T &client,
-                                             const std::string &topic) {
+boost::asio::awaitable<void> async_subscribe(T& client, const std::string& topic)
+{
   {
     auto sub_topics = std::vector<std::string>{topic};
     const auto result = co_await client.async_subscribe(std::move(sub_topics));
@@ -157,12 +163,13 @@ boost::asio::awaitable<void> async_subscribe(T &client,
   {
     const auto result = co_await client.async_receive();
     REQUIRE(result);
-    REQUIRE(
-        std::holds_alternative<hacpp::SubscriptionAckPacket_t>(result.value()));
+    REQUIRE(std::holds_alternative<hacpp::SubscriptionAckPacket_t>(result.value()));
   }
 }
 
-template <typename T> boost::asio::awaitable<void> async_connect(T &client) {
+template <typename T>
+boost::asio::awaitable<void> async_connect(T& client)
+{
   const auto error_code = co_await client.async_connect();
   REQUIRE(!error_code);
 }
