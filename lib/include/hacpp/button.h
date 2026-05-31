@@ -14,9 +14,18 @@
 
 namespace hacpp::mqtt {
 
-class Button
+class Button : protected Entity<Button>
 {
+  using Base = Entity<Button>;
+  friend Base;
+
   public:
+  using Base::async_close;
+  using Base::async_discovery;
+  using Base::async_setup;
+  using Base::async_subscribe;
+  using Base::async_update_availability;
+  using Base::executor;
   using Handler = std::function<boost::asio::awaitable<void>()>;
 
   struct Opt
@@ -41,8 +50,8 @@ class Button
   };
 
   Button(Config config, ClientType client)
-      : config_(std::move(config))
-      , client_(std::move(client))
+      : Base{std::move(client)}
+      , config_(std::move(config))
   {}
 
   const EntityCfg& config() const
@@ -50,10 +59,11 @@ class Button
     return config_.cfg;
   }
 
-  boost::asio::awaitable<Error> async_update_availability(bool state)
+  protected:
+  boost::asio::awaitable<Error> async_update_availability_impl(bool state)
   {
     if (!config_.cfg.contains(Availability::Opt::Topic)) {
-      co_return ErrorCode::InvalidConfig;
+      co_return ErrorCode::Success;
     }
 
     auto val = std::string{};
@@ -66,32 +76,33 @@ class Button
               : Availability::Defs::PayloadNotAvailable;
     }
 
-    co_return co_await client_.async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
+    co_return co_await async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
   }
 
-  boost::asio::awaitable<Error> async_discovery()
+  boost::asio::awaitable<Error> async_discovery_impl()
   {
     auto json = config_.cfg.json();
 
-    auto sub_topics = std::vector<TopicSubopts>{
-        {config_.cfg[Opt::CommandTopic], config_.qos}
-    };
-
-    auto err = co_await client_.async_subscribe(sub_topics);
-    if (err) {
-      co_return err;
-    }
-
-    co_return co_await client_.async_publish(
+    co_return co_await async_publish(
         default_component_discovery_topic(Defs::Component, config_.unique_id),
         json,
         config_.qos);
   }
 
+  boost::asio::awaitable<Error> async_subscribe_impl()
+  {
+    auto sub_topics = std::vector<TopicSubopts>{
+        {config_.cfg[Opt::CommandTopic], config_.qos}
+    };
+
+    co_return co_await async_subscribe(sub_topics);
+  }
+
+  public:
   boost::asio::awaitable<Error> async_run()
   {
     while (true) {
-      auto res = co_await client_.async_recv();
+      auto res = co_await async_recv();
       if (!res) {
         co_return res.error();
       }
@@ -101,7 +112,7 @@ class Button
         if constexpr (std::is_same_v<PacketType, async_mqtt::v5::publish_packet>) {
           if (packet.topic() == config_.cfg[Opt::CommandTopic] && packet.payload() == config_.cfg[Opt::PayloadPress]) {
             if (config_.handler) {
-              boost::asio::co_spawn(client_.executor(), config_.handler(), boost::asio::detached);
+              boost::asio::co_spawn(executor(), config_.handler(), boost::asio::detached);
             }
           }
         }
@@ -111,14 +122,8 @@ class Button
     co_return ErrorCode::Success;
   }
 
-  boost::asio::awaitable<void> async_close()
-  {
-    co_await client_.async_close();
-  }
-
   private:
   Config config_;
-  ClientType client_;
 };
 
 template <>

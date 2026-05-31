@@ -11,15 +11,15 @@ namespace hacpp::mqtt {
 
 enum class ErrorCode
 {
-  Success = 0,
-  NotAuthorized,
-  HostNotFound,
-  ConnectionRefused,
+  Success = 0,            /* No Error */
+  NotAuthorized,          /* E.g credentials */
+  HostNotFound,           /* E.g. host doe not exist*/
+  ConnectionRefused,      /* E.g. host listens on a different port */
   PacketNotAllowedToSend, // TODO: Perhaps too specific?
-  NotConnected,
-  InvalidConfig,
-  Disconnected,
-  Reconnected,
+  NotConnected,           /* Not connected */
+  InvalidConfig,          /* Invaid config */
+  Disconnected,           /* Disconnected */
+  SessionLost,            /* When client reconnected but the session is lost */
   UnknownError
 };
 
@@ -55,8 +55,7 @@ class ErrorCategory : public boost::system::error_category
       case ErrorCode::PacketNotAllowedToSend: return "packet_not_allowed_to_send";
       case ErrorCode::NotConnected:           return "not_connected";
       case ErrorCode::InvalidConfig:          return "invalid_config";
-      case ErrorCode::Disconnected:           return "disconnected";
-      case ErrorCode::Reconnected:            return "reconnected";
+      case ErrorCode::SessionLost:            return "session_lost";
       case ErrorCode::UnknownError:           return "unknown_error";
       default:                                return "unknown_error";
     }

@@ -100,7 +100,7 @@ TEST_CASE("Button can receive press command", "[button]")
                 })
                 .create());
         // clang-format on
-        auto err_disc = co_await button->async_discovery();
+        auto err_disc = co_await button->async_setup();
         REQUIRE(!err_disc);
         auto packet_disc = co_await async_recv_packet<PublishPacket>(verifier_client);
 

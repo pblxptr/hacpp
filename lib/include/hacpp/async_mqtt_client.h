@@ -52,9 +52,17 @@ class AsyncMqttClient2
 
   struct Connection
   {
-    State state{State::Closed};
-    int attempt = 0;
-    int max_attempts = 10;
+    explicit Connection(boost::asio::any_io_executor exe)
+        : state{State::Closed}
+        , attempt{0}
+        , max_attempts{10}
+        , wait_timer{exe}
+    {}
+
+    State state;
+    int attempt;
+    int max_attempts;
+    boost::asio::steady_timer wait_timer;
   };
 
   public:
@@ -70,8 +78,9 @@ class AsyncMqttClient2
   };
 
   AsyncMqttClient2(boost::asio::any_io_executor exe, const Config& config)
-      : impl_(Impl{exe})
-      , config_(config)
+      : impl_{exe}
+      , config_{config}
+      , conn_{exe}
   {}
 
   auto executor()
@@ -221,7 +230,6 @@ class AsyncMqttClient2
     if (conn_.state == State::Closed) {
       co_return ErrorCode::Disconnected;
     }
-    // TODO: Disable reconnection when user expliclity calls close/disconnect
 
     const auto base_delay = std::chrono::seconds{1};
     auto timer = boost::asio::steady_timer{executor()};
@@ -237,12 +245,12 @@ class AsyncMqttClient2
       spdlog::debug("Reconnecting, attempt: {}/{}", conn_.attempt, conn_.max_attempts);
 
       // timer.expires_after(std::chrono::seconds{base_delay.count() * std::pow(2, conn_.attempt - 1)});
-      timer.expires_after(std::chrono::seconds{base_delay.count() * static_cast<int>(std::pow(2, conn_.attempt - 1))});
+      timer.expires_after(std::chrono::seconds{base_delay.count() * (1 << (conn_.attempt - 1))});
       co_await timer.async_wait(boost::asio::use_awaitable);
 
       err = co_await async_connect();
       if (!err) {
-        co_return ErrorCode::Reconnected;
+        co_return ErrorCode::SessionLost;
       }
 
       spdlog::debug("Reconnecting failed: {}", err.message());

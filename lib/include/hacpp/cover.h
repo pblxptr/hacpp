@@ -14,9 +14,18 @@
 
 namespace hacpp::mqtt {
 
-class Cover
+class Cover : protected Entity<Cover>
 {
+  using Base = Entity<Cover>;
+  friend Base;
+
   public:
+  using Base::async_close;
+  using Base::async_discovery;
+  using Base::async_setup;
+  using Base::async_subscribe;
+  using Base::async_update_availability;
+  using Base::executor;
   using Handler = std::function<boost::asio::awaitable<void>()>;
 
   struct Opt
@@ -56,8 +65,8 @@ class Cover
   };
 
   Cover(Config config, ClientType client)
-      : config_(std::move(config))
-      , client_(std::move(client))
+      : Base{std::move(client)}
+      , config_(std::move(config))
   {}
 
   const EntityCfg& config() const
@@ -71,13 +80,55 @@ class Cover
       co_return ErrorCode::InvalidConfig;
     }
 
-    co_return co_await client_.async_publish(config_.cfg[Opt::StateTopic], state, config_.qos);
+    co_return co_await async_publish(config_.cfg[Opt::StateTopic], state, config_.qos);
   }
 
-  boost::asio::awaitable<Error> async_update_availability(bool state)
+  public:
+  boost::asio::awaitable<Error> async_run()
   {
+    while (true) {
+      auto res = co_await async_recv();
+      if (!res) {
+        co_return res.error();
+      }
+
+      res->visit([&](auto&& packet) {
+        using PacketType = std::decay_t<decltype(packet)>;
+        if constexpr (std::is_same_v<PacketType, async_mqtt::v5::publish_packet>) {
+          if (packet.topic() == config_.cfg[Opt::CommandTopic]) {
+            auto payload = packet.payload();
+            if (payload == config_.cfg[Opt::PayloadOpen]) {
+              if (config_.on_open) {
+                boost::asio::co_spawn(executor(), config_.on_open(), boost::asio::detached);
+              }
+            } else if (payload == config_.cfg[Opt::PayloadClose]) {
+              if (config_.on_close) {
+                boost::asio::co_spawn(executor(), config_.on_close(), boost::asio::detached);
+              }
+            } else if (payload == config_.cfg[Opt::PayloadStop]) {
+              if (config_.on_stop) {
+                boost::asio::co_spawn(executor(), config_.on_stop(), boost::asio::detached);
+              }
+            }
+          }
+        }
+      });
+    }
+
+    co_return ErrorCode::Success;
+  }
+
+  protected:
+  boost::asio::awaitable<Error> async_update_availability_impl(bool state)
+  {
+    /*
+      TODO:
+        - Move the implementation to Entity
+        - Some of entities do not require awailability so allow to succeed when it is not mandatory
+        - Bear in mind the Success is returned here, this is valid for Cover, not for the rest of entities
+    */
     if (!config_.cfg.contains(Availability::Opt::Topic)) {
-      co_return ErrorCode::InvalidConfig;
+      co_return ErrorCode::Success;
     }
 
     auto val = std::string{};
@@ -90,70 +141,30 @@ class Cover
               : Availability::Defs::PayloadNotAvailable;
     }
 
-    co_return co_await client_.async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
+    co_return co_await async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
   }
 
-  boost::asio::awaitable<Error> async_discovery()
+  boost::asio::awaitable<Error> async_discovery_impl()
   {
     auto json = config_.cfg.json();
 
-    auto sub_topics = std::vector<TopicSubopts>{
-        {config_.cfg[Opt::CommandTopic], config_.qos}
-    };
-
-    auto err = co_await client_.async_subscribe(sub_topics);
-    if (err) {
-      co_return err;
-    }
-
-    co_return co_await client_.async_publish(
+    co_return co_await async_publish(
         default_component_discovery_topic(Defs::Component, config_.unique_id),
         json,
         config_.qos);
   }
 
-  boost::asio::awaitable<Error> async_run()
+  boost::asio::awaitable<Error> async_subscribe_impl()
   {
-    while (true) {
-      auto res = co_await client_.async_recv();
-      if (!res) {
-        co_return res.error();
-      }
+    auto sub_topics = std::vector<TopicSubopts>{
+        {config_.cfg[Opt::CommandTopic], config_.qos}
+    };
 
-      res->visit([&](auto&& packet) {
-        using PacketType = std::decay_t<decltype(packet)>;
-        if constexpr (std::is_same_v<PacketType, async_mqtt::v5::publish_packet>) {
-          if (packet.topic() == config_.cfg[Opt::CommandTopic]) {
-            auto payload = packet.payload();
-            if (payload == config_.cfg[Opt::PayloadOpen]) {
-              if (config_.on_open) {
-                boost::asio::co_spawn(client_.executor(), config_.on_open(), boost::asio::detached);
-              }
-            } else if (payload == config_.cfg[Opt::PayloadClose]) {
-              if (config_.on_close) {
-                boost::asio::co_spawn(client_.executor(), config_.on_close(), boost::asio::detached);
-              }
-            } else if (payload == config_.cfg[Opt::PayloadStop]) {
-              if (config_.on_stop) {
-                boost::asio::co_spawn(client_.executor(), config_.on_stop(), boost::asio::detached);
-              }
-            }
-          }
-        }
-      });
-    }
-
-    co_return ErrorCode::Success;
-  }
-
-  boost::asio::awaitable<void> async_close()
-  {
-    co_await client_.async_close();
+    co_return co_await async_subscribe(sub_topics);
   }
 
   private:
   Config config_;
-  ClientType client_;
 };
 
 template <>
