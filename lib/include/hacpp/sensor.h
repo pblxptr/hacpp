@@ -11,9 +11,18 @@
 
 namespace hacpp::mqtt {
 
-class Sensor
+class Sensor : protected Entity<Sensor>
 {
+  using Base = Entity<Sensor>;
+  friend Base;
+
   public:
+  using Base::async_close;
+  using Base::async_discovery;
+  using Base::async_setup;
+  using Base::async_subscribe;
+  using Base::async_update_availability;
+  using Base::executor;
   struct Opt
   {
     static constexpr Property StateTopic{"state_topic"};
@@ -34,8 +43,8 @@ class Sensor
   };
 
   Sensor(Config config, ClientType client)
-      : config_(std::move(config))
-      , client_(std::move(client))
+      : Base{std::move(client)}
+      , config_(std::move(config))
   {}
 
   const EntityCfg& config() const
@@ -45,13 +54,14 @@ class Sensor
 
   boost::asio::awaitable<Error> async_update_state(const std::string& state)
   {
-    co_return co_await client_.async_publish(config_.cfg[Opt::StateTopic], state, config_.qos);
+    co_return co_await async_publish(config_.cfg[Opt::StateTopic], state, config_.qos);
   }
 
-  boost::asio::awaitable<Error> async_update_availability(bool state)
+  protected:
+  boost::asio::awaitable<Error> async_update_availability_impl(bool state)
   {
     if (!config_.cfg.contains(Availability::Opt::Topic)) {
-      co_return ErrorCode::InvalidConfig;
+      co_return ErrorCode::Success;
     }
 
     auto val = std::string{};
@@ -64,23 +74,29 @@ class Sensor
               : Availability::Defs::PayloadNotAvailable;
     }
 
-    co_return co_await client_.async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
+    co_return co_await async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
   }
 
-  boost::asio::awaitable<Error> async_discovery()
+  boost::asio::awaitable<Error> async_discovery_impl()
   {
     auto json = config_.cfg.json();
 
-    co_return co_await client_.async_publish(
+    co_return co_await async_publish(
         default_component_discovery_topic(Defs::Component, config_.unique_id),
         json,
         config_.qos);
   }
 
+  boost::asio::awaitable<Error> async_subscribe_impl()
+  {
+    co_return Error{};
+  }
+
+  public:
   boost::asio::awaitable<Error> async_run()
   {
     while (true) {
-      auto recv_result = co_await client_.async_recv();
+      auto recv_result = co_await async_recv();
 
       if (!recv_result) {
         co_return recv_result.error();
@@ -88,14 +104,9 @@ class Sensor
     }
   }
 
-  boost::asio::awaitable<void> async_close()
-  {
-    co_await client_.async_close();
-  }
 
   private:
   Config config_;
-  ClientType client_;
 };
 
 template <>

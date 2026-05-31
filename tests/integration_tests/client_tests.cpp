@@ -207,7 +207,7 @@ TEST_CASE("Client can autoreconnect", "[autoreconnect]")
           auto res = co_await client->async_recv();
           if (!res) {
             spdlog::info("Recv error in test: {}", res.error().message());
-            if (res.error() == ErrorCode::Reconnected) {
+            if (res.error() == ErrorCode::SessionLost) {
               reconnected_signaled = true;
               break;
             }

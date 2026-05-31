@@ -11,9 +11,19 @@
 
 namespace hacpp::mqtt {
 
-class BinarySensor
+class BinarySensor : protected Entity<BinarySensor>
 {
+  using Base = Entity<BinarySensor>;
+  friend Base;
+
   public:
+  using Base::async_close;
+  using Base::async_discovery;
+  using Base::async_setup;
+  using Base::async_subscribe;
+  using Base::async_update_availability;
+  using Base::executor;
+
   struct Opt
   {
     static constexpr Property PayloadOn{"payload_on"};
@@ -38,8 +48,8 @@ class BinarySensor
   };
 
   BinarySensor(Config config, ClientType client)
-      : config_(std::move(config))
-      , client_(std::move(client))
+      : Base{std::move(client)}
+      , config_(std::move(config))
   {}
 
   const EntityCfg& config() const
@@ -49,16 +59,44 @@ class BinarySensor
 
   boost::asio::awaitable<Error> async_update_state(bool state)
   {
-    co_return co_await client_.async_publish(
+    co_return co_await async_publish(
         config_.cfg[Opt::StateTopic],
         state ? config_.cfg[Opt::PayloadOn] : config_.cfg[Opt::PayloadOff],
         config_.qos);
   }
 
-  boost::asio::awaitable<Error> async_update_availability(bool state)
+  boost::asio::awaitable<Error> async_run()
+  {
+    while (true) {
+      auto recv_result = co_await async_recv();
+
+      if (!recv_result) {
+        co_return recv_result.error();
+      }
+    }
+    co_return Error{};
+  }
+
+protected:
+  boost::asio::awaitable<Error> async_discovery_impl()
+  {
+    auto json = config_.cfg.json();
+
+    co_return co_await async_publish(
+        default_component_discovery_topic(Defs::Component, config_.unique_id),
+        json,
+        config_.qos);
+  }
+
+  boost::asio::awaitable<Error> async_subscribe_impl()
+  {
+    co_return Error{};
+  }
+
+  boost::asio::awaitable<Error> async_update_availability_impl(bool state)
   {
     if (!config_.cfg.contains(Availability::Opt::Topic)) {
-      co_return ErrorCode::InvalidConfig;
+      co_return ErrorCode::Success;
     }
 
     auto val = std::string{};
@@ -71,38 +109,11 @@ class BinarySensor
               : Availability::Defs::PayloadNotAvailable;
     }
 
-    co_return co_await client_.async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
+    co_return co_await async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
   }
 
-  boost::asio::awaitable<Error> async_discovery()
-  {
-    auto json = config_.cfg.json();
-
-    co_return co_await client_.async_publish(
-        default_component_discovery_topic(Defs::Component, config_.unique_id),
-        json,
-        config_.qos);
-  }
-
-  boost::asio::awaitable<Error> async_run()
-  {
-    while (true) {
-      auto recv_result = co_await client_.async_recv();
-
-      if (!recv_result) {
-        co_return recv_result.error();
-      }
-    }
-  }
-
-  boost::asio::awaitable<void> async_close()
-  {
-    co_await client_.async_close();
-  }
-
-  private:
+private:
   Config config_;
-  ClientType client_;
 };
 
 template <>
