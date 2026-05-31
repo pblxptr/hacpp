@@ -122,7 +122,6 @@ class Button : protected Entity<Button>
     co_return ErrorCode::Success;
   }
 
-
   private:
   Config config_;
 };
@@ -158,14 +157,14 @@ class Factory<Button>
   }
 
   private:
-    std::string unique_id_;
-    EntityCfg cfg_{
-        {Button::Opt::PayloadPress, Button::Defs::PayloadPress},
-        {Button::Opt::CommandTopic, default_component_command_topic(Button::Defs::Component, unique_id_)}
-    };
-    QoS qos_ = QoS::at_least_once;
-    ClientType client_;
-    Button::Handler handler_;
+  std::string unique_id_;
+  EntityCfg cfg_{
+      {Button::Opt::PayloadPress, Button::Defs::PayloadPress},
+      {Button::Opt::CommandTopic, default_component_command_topic(Button::Defs::Component, unique_id_)}
+  };
+  QoS qos_ = QoS::at_least_once;
+  ClientType client_;
+  Button::Handler handler_;
 };
 
 } // namespace hacpp::mqtt

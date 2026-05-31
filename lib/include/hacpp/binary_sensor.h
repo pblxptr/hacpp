@@ -77,7 +77,7 @@ class BinarySensor : protected Entity<BinarySensor>
     co_return Error{};
   }
 
-protected:
+  protected:
   boost::asio::awaitable<Error> async_discovery_impl()
   {
     auto json = config_.cfg.json();
@@ -112,7 +112,7 @@ protected:
     co_return co_await async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
   }
 
-private:
+  private:
   Config config_;
 };
 

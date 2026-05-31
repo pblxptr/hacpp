@@ -11,15 +11,15 @@ namespace hacpp::mqtt {
 
 enum class ErrorCode
 {
-  Success = 0, /* No Error */
-  NotAuthorized, /* E.g credentials */
-  HostNotFound, /* E.g. host doe not exist*/
-  ConnectionRefused, /* E.g. host listens on a different port */
+  Success = 0,            /* No Error */
+  NotAuthorized,          /* E.g credentials */
+  HostNotFound,           /* E.g. host doe not exist*/
+  ConnectionRefused,      /* E.g. host listens on a different port */
   PacketNotAllowedToSend, // TODO: Perhaps too specific?
-  NotConnected, /* Not connected */
-  InvalidConfig, /* Invaid config */
-  Disconnected, /* Disconnected */
-  SessionLost, /* When client reconnected but the session is lost */
+  NotConnected,           /* Not connected */
+  InvalidConfig,          /* Invaid config */
+  Disconnected,           /* Disconnected */
+  SessionLost,            /* When client reconnected but the session is lost */
   UnknownError
 };
 

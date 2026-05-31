@@ -104,7 +104,6 @@ class Sensor : protected Entity<Sensor>
     }
   }
 
-
   private:
   Config config_;
 };

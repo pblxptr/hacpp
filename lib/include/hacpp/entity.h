@@ -121,9 +121,9 @@ class EntityCfg
 template <typename Impl>
 class Entity
 {
-public:
+  public:
   explicit Entity(ClientType client)
-    : client_{std::move(client)}
+      : client_{std::move(client)}
   {}
 
   auto executor()
@@ -192,7 +192,7 @@ public:
     co_await client_.async_close();
   }
 
-private:
+  private:
   Impl& impl()
   {
     return static_cast<Impl&>(*this);
@@ -207,7 +207,7 @@ private:
     co_return co_await async_setup();
   }
 
-private:
+  private:
   ClientType client_;
 };
 

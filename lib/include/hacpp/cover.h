@@ -19,7 +19,7 @@ class Cover : protected Entity<Cover>
   using Base = Entity<Cover>;
   friend Base;
 
-public:
+  public:
   using Base::async_close;
   using Base::async_discovery;
   using Base::async_setup;
@@ -83,7 +83,7 @@ public:
     co_return co_await async_publish(config_.cfg[Opt::StateTopic], state, config_.qos);
   }
 
-public:
+  public:
   boost::asio::awaitable<Error> async_run()
   {
     while (true) {
@@ -118,7 +118,7 @@ public:
     co_return ErrorCode::Success;
   }
 
-protected:
+  protected:
   boost::asio::awaitable<Error> async_update_availability_impl(bool state)
   {
     /*
@@ -163,7 +163,7 @@ protected:
     co_return co_await async_subscribe(sub_topics);
   }
 
-private:
+  private:
   Config config_;
 };
 
