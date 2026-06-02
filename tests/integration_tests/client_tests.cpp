@@ -440,4 +440,3 @@ TEST_CASE("Subscribe waits for autoreconnect before sending", "[client][autoreco
   CHECK(subscribe_completed);
   CHECK(!subscribe_err);
 }
-

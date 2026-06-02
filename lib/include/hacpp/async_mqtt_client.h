@@ -65,7 +65,7 @@ class AsyncMqttClient2
     boost::asio::steady_timer autorec_wait_timer;
   };
 
-public:
+  public:
   struct Config
   {
     std::string host{"localhost"};
@@ -233,7 +233,7 @@ public:
     co_return RecvResult{*packet};
   }
 
-private:
+  private:
   boost::asio::awaitable<void> async_wait_autoreconnect()
   {
     auto err = Error{};
@@ -241,7 +241,6 @@ private:
 
     spdlog::debug("Reconnect wait finished: {} ({})", err.value(), err.message());
   }
-
 
   boost::asio::awaitable<Error> async_handle_reconnect()
   {
