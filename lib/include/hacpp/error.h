@@ -20,6 +20,7 @@ enum class ErrorCode
   InvalidConfig,          /* Invaid config */
   Disconnected,           /* Disconnected */
   SessionLost,            /* When client reconnected but the session is lost */
+  InternalError,          /* Internal error, e.g., logic error, invalid state, etc. */
   UnknownError
 };
 
@@ -56,6 +57,7 @@ class ErrorCategory : public boost::system::error_category
       case ErrorCode::NotConnected:           return "not_connected";
       case ErrorCode::InvalidConfig:          return "invalid_config";
       case ErrorCode::SessionLost:            return "session_lost";
+      case ErrorCode::InternalError:          return "internal_error";
       case ErrorCode::UnknownError:           return "unknown_error";
       default:                                return "unknown_error";
     }

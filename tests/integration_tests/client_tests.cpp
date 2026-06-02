@@ -7,7 +7,7 @@
 using hacpp::mqtt::Error;
 using hacpp::mqtt::ErrorCode;
 
-TEST_CASE("Client can connect to broker")
+TEST_CASE("Client can connect to broker", "[client]")
 {
   // Arrange
   auto io = boost::asio::io_context{};
@@ -31,7 +31,7 @@ TEST_CASE("Client can connect to broker")
   io.run();
 }
 
-TEST_CASE("Client cannot connect to broker")
+TEST_CASE("Client cannot connect to broker", "[client]")
 {
   // Arrange
   auto io = boost::asio::io_context{};
@@ -103,7 +103,7 @@ TEST_CASE("Client cannot connect to broker")
   }
 }
 
-TEST_CASE("Client is not operational when disconnected")
+TEST_CASE("Client is not operational when disconnected", "[client]")
 {
   // Arrange
   auto io = boost::asio::io_context{};
@@ -181,7 +181,7 @@ void run_proxy(const std::string& cmd)
   }
 }
 
-TEST_CASE("Client can autoreconnect", "[autoreconnect]")
+TEST_CASE("Client can autoreconnect", "[client][autoreconnect]")
 {
   // Arrange
   auto io = boost::asio::io_context{};
@@ -196,6 +196,7 @@ TEST_CASE("Client can autoreconnect", "[autoreconnect]")
 
   bool reconnected_signaled = false;
 
+  // Act && Assert
   // NOLINTBEGIN
   boost::asio::co_spawn(
       strand,
@@ -255,3 +256,188 @@ TEST_CASE("Client can autoreconnect", "[autoreconnect]")
 
   CHECK(reconnected_signaled);
 }
+
+TEST_CASE("Publish waits for autoreconnect before sending", "[client][autoreconnect_defer_publish]")
+{
+  // Arrange
+  auto io = boost::asio::io_context{};
+  auto strand = boost::asio::make_strand(io);
+
+  auto proxy_config = config;
+  proxy_config.port = "1884";
+  auto client = std::make_shared<hacpp::mqtt::AsyncMqttClient2>(strand, proxy_config);
+
+  run_proxy("setup");
+  run_proxy("reconnect");
+
+  auto reconnected_signaled = false;
+  auto publish_completed = false;
+  auto publish_err = Error{};
+
+  // NOLINTBEGIN
+  boost::asio::co_spawn(
+      strand,
+      [&, client]() -> boost::asio::awaitable<void> {
+        auto err = co_await client->async_connect();
+        REQUIRE(!err);
+
+        while (true) {
+          auto res = co_await client->async_recv();
+          if (!res) {
+            spdlog::info("Recv error in test: {}", res.error().message());
+            if (res.error() == ErrorCode::SessionLost) {
+              reconnected_signaled = true;
+              break;
+            }
+            if (res.error() == ErrorCode::Disconnected) {
+              break;
+            }
+          }
+        }
+      },
+      rethrow);
+
+  boost::asio::co_spawn(
+      strand,
+      [&, client]() -> boost::asio::awaitable<void> {
+        auto timer = boost::asio::steady_timer{strand};
+
+        timer.expires_after(std::chrono::milliseconds(500));
+        co_await timer.async_wait(boost::asio::use_awaitable);
+
+        spdlog::info("TEST: Disconnecting proxy...");
+        run_proxy("disconnect");
+
+        boost::asio::co_spawn(
+            strand,
+            [&, client]() -> boost::asio::awaitable<void> {
+              auto timer = boost::asio::steady_timer{strand};
+              timer.expires_after(std::chrono::seconds(2));
+              co_await timer.async_wait(boost::asio::use_awaitable);
+
+              publish_err = co_await client->async_publish(
+                  "test/topic",
+                  "payload during reconnect",
+                  async_mqtt::qos::at_least_once);
+              publish_completed = true;
+            },
+            rethrow);
+
+        timer.expires_after(std::chrono::seconds(5));
+        co_await timer.async_wait(boost::asio::use_awaitable);
+
+        spdlog::info("TEST: Reconnecting proxy...");
+        run_proxy("reconnect");
+      },
+      rethrow);
+
+  boost::asio::co_spawn(
+      strand,
+      [&]() -> boost::asio::awaitable<void> {
+        boost::asio::steady_timer timer{strand};
+        timer.expires_after(std::chrono::seconds(15));
+        co_await timer.async_wait(boost::asio::use_awaitable);
+        io.stop();
+      },
+      rethrow);
+  // NOLINTEND
+
+  io.run();
+
+  CHECK(reconnected_signaled);
+  CHECK(publish_completed);
+  CHECK(!publish_err);
+}
+
+TEST_CASE("Subscribe waits for autoreconnect before sending", "[client][autoreconnect_defere_subscribe]")
+{
+  // Arrange
+  auto io = boost::asio::io_context{};
+  auto strand = boost::asio::make_strand(io);
+
+  auto proxy_config = config;
+  proxy_config.port = "1884";
+  auto client = std::make_shared<hacpp::mqtt::AsyncMqttClient2>(strand, proxy_config);
+
+  run_proxy("setup");
+  run_proxy("reconnect");
+
+  auto reconnected_signaled = false;
+  auto subscribe_completed = false;
+  auto subscribe_err = Error{};
+
+  // NOLINTBEGIN
+  boost::asio::co_spawn(
+      strand,
+      [&, client]() -> boost::asio::awaitable<void> {
+        auto err = co_await client->async_connect();
+        REQUIRE(!err);
+
+        while (true) {
+          auto res = co_await client->async_recv();
+          if (!res) {
+            spdlog::info("Recv error in test: {}", res.error().message());
+            if (res.error() == ErrorCode::SessionLost) {
+              reconnected_signaled = true;
+              break;
+            }
+            if (res.error() == ErrorCode::Disconnected) {
+              break;
+            }
+          }
+        }
+      },
+      rethrow);
+
+  boost::asio::co_spawn(
+      strand,
+      [&, client]() -> boost::asio::awaitable<void> {
+        auto timer = boost::asio::steady_timer{strand};
+
+        timer.expires_after(std::chrono::milliseconds(500));
+        co_await timer.async_wait(boost::asio::use_awaitable);
+
+        spdlog::info("TEST: Disconnecting proxy...");
+        run_proxy("disconnect");
+
+        boost::asio::co_spawn(
+            strand,
+            [&, client]() -> boost::asio::awaitable<void> {
+              auto timer = boost::asio::steady_timer{strand};
+              timer.expires_after(std::chrono::seconds(2));
+              co_await timer.async_wait(boost::asio::use_awaitable);
+
+              auto topics = std::vector<hacpp::mqtt::TopicSubopts>{
+                  {"test/topic", async_mqtt::qos::at_least_once}
+              };
+              subscribe_err = co_await client->async_subscribe(topics);
+              subscribe_completed = true;
+            },
+            rethrow);
+
+        timer.expires_after(std::chrono::seconds(5));
+        co_await timer.async_wait(boost::asio::use_awaitable);
+
+        spdlog::info("TEST: Reconnecting proxy...");
+        run_proxy("reconnect");
+      },
+      rethrow);
+
+  boost::asio::co_spawn(
+      strand,
+      [&]() -> boost::asio::awaitable<void> {
+        boost::asio::steady_timer timer{strand};
+        timer.expires_after(std::chrono::seconds(15));
+        co_await timer.async_wait(boost::asio::use_awaitable);
+        io.stop();
+      },
+      rethrow);
+  // NOLINTEND
+
+  io.run();
+
+  CHECK(reconnected_signaled);
+  CHECK(subscribe_completed);
+  CHECK(!subscribe_err);
+}
+

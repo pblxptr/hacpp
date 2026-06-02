@@ -56,16 +56,16 @@ class AsyncMqttClient2
         : state{State::Closed}
         , attempt{0}
         , max_attempts{10}
-        , wait_timer{exe}
+        , autorec_wait_timer{exe}
     {}
 
     State state;
     int attempt;
     int max_attempts;
-    boost::asio::steady_timer wait_timer;
+    boost::asio::steady_timer autorec_wait_timer;
   };
 
-  public:
+public:
   struct Config
   {
     std::string host{"localhost"};
@@ -129,6 +129,7 @@ class AsyncMqttClient2
     co_await impl_.async_disconnect(boost::asio::redirect_error(boost::asio::use_awaitable, err));
 
     conn_.state = State::Closed;
+    conn_.autorec_wait_timer.cancel();
 
     co_return map_err(err);
   }
@@ -140,6 +141,7 @@ class AsyncMqttClient2
 
     // TODO: Consider calling disconnect first
     conn_.state = State::Closed;
+    conn_.autorec_wait_timer.cancel();
 
     co_return map_err(err);
   }
@@ -151,7 +153,12 @@ class AsyncMqttClient2
   {
     spdlog::debug("Publishing to topic: {}, payload: {}, QoS: {}", topic, payload, static_cast<int>(qos));
 
+    if (conn_.state == State::Reconnecting) {
+      co_await async_wait_autoreconnect();
+    }
+
     if (conn_.state != State::Connected) {
+      spdlog::debug("Not connected, cannot publish");
       co_return ErrorCode::NotConnected;
     }
 
@@ -184,7 +191,12 @@ class AsyncMqttClient2
 
   boost::asio::awaitable<Error> async_subscribe(const std::vector<TopicSubopts>& sub_entry)
   {
+    if (conn_.state == State::Reconnecting) {
+      co_await async_wait_autoreconnect();
+    }
+
     if (conn_.state != State::Connected) {
+      spdlog::debug("Not connected, cannot subscribe");
       co_return ErrorCode::NotConnected;
     }
 
@@ -215,46 +227,61 @@ class AsyncMqttClient2
       auto err_rc = co_await async_handle_reconnect();
       co_return std::unexpected(err_rc);
     }
-    if (err) {
-      co_return std::unexpected(map_err(err));
-    }
 
     packet->visit([](auto&& p) { spdlog::debug("Received packet: {}", detail::str(p)); });
 
     co_return RecvResult{*packet};
   }
 
-  private:
+private:
+  boost::asio::awaitable<void> async_wait_autoreconnect()
+  {
+    auto err = Error{};
+    co_await conn_.autorec_wait_timer.async_wait(boost::asio::redirect_error(boost::asio::use_awaitable, err));
+
+    spdlog::debug("Reconnect wait finished: {} ({})", err.value(), err.message());
+  }
+
+
   boost::asio::awaitable<Error> async_handle_reconnect()
   {
     if (conn_.state == State::Closed) {
       co_return ErrorCode::Disconnected;
     }
 
+    if (conn_.state == State::Reconnecting) {
+      spdlog::warn("Already reconnecting, waiting for reconnection to complete...");
+      co_return ErrorCode::InternalError;
+    }
+
     const auto base_delay = std::chrono::seconds{1};
     auto timer = boost::asio::steady_timer{executor()};
 
-    if (conn_.attempt >= conn_.max_attempts) {
-      co_return ErrorCode::Disconnected;
-    }
-
     conn_.state = State::Reconnecting;
+    conn_.autorec_wait_timer.expires_at(boost::asio::steady_timer::time_point::max());
+    spdlog::debug("Wait timer armed");
 
     auto err = Error{};
     while (conn_.attempt++ < conn_.max_attempts) {
       spdlog::debug("Reconnecting, attempt: {}/{}", conn_.attempt, conn_.max_attempts);
 
-      // timer.expires_after(std::chrono::seconds{base_delay.count() * std::pow(2, conn_.attempt - 1)});
       timer.expires_after(std::chrono::seconds{base_delay.count() * (1 << (conn_.attempt - 1))});
       co_await timer.async_wait(boost::asio::use_awaitable);
 
       err = co_await async_connect();
       if (!err) {
+        conn_.state = State::Connected;
+        conn_.autorec_wait_timer.cancel();
+        spdlog::debug("Reconnection successful");
         co_return ErrorCode::SessionLost;
       }
 
       spdlog::debug("Reconnecting failed: {}", err.message());
     }
+
+    conn_.state = State::Closed;
+    conn_.autorec_wait_timer.cancel();
+
     co_return err;
   }
 
