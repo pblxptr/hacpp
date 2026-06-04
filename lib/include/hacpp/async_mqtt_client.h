@@ -158,7 +158,7 @@ class AsyncMqttClient2
     }
 
     if (conn_.state != State::Connected) {
-      spdlog::debug("Not connected, cannot publish");
+      spdlog::warn("Not connected, cannot publish");
       co_return ErrorCode::NotConnected;
     }
 
@@ -196,7 +196,7 @@ class AsyncMqttClient2
     }
 
     if (conn_.state != State::Connected) {
-      spdlog::debug("Not connected, cannot subscribe");
+      spdlog::warn("Not connected, cannot subscribe");
       co_return ErrorCode::NotConnected;
     }
 
@@ -233,7 +233,7 @@ class AsyncMqttClient2
     co_return RecvResult{*packet};
   }
 
-  private:
+private:
   boost::asio::awaitable<void> async_wait_autoreconnect()
   {
     auto err = Error{};
@@ -249,7 +249,7 @@ class AsyncMqttClient2
     }
 
     if (conn_.state == State::Reconnecting) {
-      spdlog::warn("Already reconnecting, waiting for reconnection to complete...");
+      spdlog::warn("Already reconnecting, cannot handle another reconnect");
       co_return ErrorCode::InternalError;
     }
 
@@ -258,7 +258,6 @@ class AsyncMqttClient2
 
     conn_.state = State::Reconnecting;
     conn_.autorec_wait_timer.expires_at(boost::asio::steady_timer::time_point::max());
-    spdlog::debug("Wait timer armed");
 
     auto err = Error{};
     while (conn_.attempt++ < conn_.max_attempts) {
@@ -284,7 +283,7 @@ class AsyncMqttClient2
     co_return err;
   }
 
-  private:
+private:
   Impl impl_;
   Config config_;
   Connection conn_;

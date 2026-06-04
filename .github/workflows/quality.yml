@@ -50,7 +50,22 @@ jobs:
         shell: bash
         run: bash ../tools/check-clang-tidy.sh
 
-      - name: Verify clang-tidy
+      - name: Check clang-tidy results
         working-directory: build
         shell: bash
-        run: bash ../tools/verify-clang-tidy.sh
+        run: |
+          mkdir -p artifacts
+          cp compile_commands.json artifacts/
+
+          if [[ $(wc -l < errors.yml) != "0" ]]; then
+            cp errors.yml artifacts/
+            cat errors.yml
+            false
+          fi
+
+      - name: Upload clang-tidy artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: clang-tidy-artifacts
+          path: build/artifacts
