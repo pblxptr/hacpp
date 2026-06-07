@@ -43,42 +43,42 @@ inline auto rethrow(const std::exception_ptr& eptr)
 
 struct IoContext
 {
-  void stop()
-  {
-    ioc_.stop();
-  }
+    void stop()
+    {
+      ioc_.stop();
+    }
 
-  void run(std::chrono::seconds timeout = std::chrono::seconds{30})
-  {
-    //    // NOLINTBEGIN
-    boost::asio::co_spawn(
-        ioc_,
-        [this, timeout]() -> boost::asio::awaitable<void> {
-          auto timer = boost::asio::steady_timer{ioc_.get_executor()};
-          timer.expires_after(timeout);
+    void run(std::chrono::seconds timeout = std::chrono::seconds{30})
+    {
+      //    // NOLINTBEGIN
+      boost::asio::co_spawn(
+          ioc_,
+          [this, timeout]() -> boost::asio::awaitable<void> {
+            auto timer = boost::asio::steady_timer{ioc_.get_executor()};
+            timer.expires_after(timeout);
 
-          auto ec = boost::system::error_code{};
+            auto ec = boost::system::error_code{};
 
-          co_await timer.async_wait(boost::asio::redirect_error(boost::asio::use_awaitable, ec));
-          if (!ec) {
-            WARN("Test timeout!");
-            REQUIRE(false);
-            co_return;
-          }
-        },
-        rethrow);
-    //    // NOLINTEND
+            co_await timer.async_wait(boost::asio::redirect_error(boost::asio::use_awaitable, ec));
+            if (!ec) {
+              WARN("Test timeout!");
+              REQUIRE(false);
+              co_return;
+            }
+          },
+          rethrow);
+      //    // NOLINTEND
 
-    ioc_.run();
-  }
+      ioc_.run();
+    }
 
-  boost::asio::io_context& handle()
-  {
-    return ioc_;
-  }
+    boost::asio::io_context& handle()
+    {
+      return ioc_;
+    }
 
-  boost::asio::io_context ioc_{};
-  boost::asio::executor_work_guard<decltype(ioc_.get_executor())> work{ioc_.get_executor()};
+    boost::asio::io_context ioc_{};
+    boost::asio::executor_work_guard<decltype(ioc_.get_executor())> work{ioc_.get_executor()};
 };
 
 inline auto default_config()

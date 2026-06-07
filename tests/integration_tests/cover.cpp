@@ -1,26 +1,54 @@
 #include "config.h"
 
+#include <hacpp/async_mqtt_client.h>
 #include <hacpp/cover.h>
+#include <hacpp/entity.h>
+#include <hacpp/hacpp.h>
 
-#include <catch2/catch_all.hpp>
+#include <boost/asio/any_io_executor.hpp>
+#include <boost/asio/awaitable.hpp>
+#include <boost/asio/impl/co_spawn.hpp>
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/steady_timer.hpp>
+#include <boost/asio/strand.hpp>
+#include <boost/asio/use_awaitable.hpp>
+#include <boost/json/parse.hpp>
+#include <catch2/catch_test_macros.hpp>
 
-using namespace hacpp::mqtt;
+#include <chrono>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-static constexpr auto UniqueId = "cover_unique_id";
+namespace {
 
-static boost::asio::awaitable<ClientType> get_client(boost::asio::any_io_executor exe)
+using hacpp::mqtt::ClientType;
+using hacpp::mqtt::Cover;
+using hacpp::mqtt::default_component_availability_topic;
+using hacpp::mqtt::default_component_command_topic;
+using hacpp::mqtt::default_component_discovery_topic;
+using hacpp::mqtt::default_component_state_topic;
+using hacpp::mqtt::Factory;
+using hacpp::mqtt::PublishPacket;
+using hacpp::mqtt::QoS;
+using hacpp::mqtt::TopicSubopts;
+
+constexpr auto UniqueId = "cover_unique_id";
+
+boost::asio::awaitable<ClientType> get_client(boost::asio::any_io_executor exe)
 {
-  auto client = ClientType{exe, config};
+  auto client = ClientType{exe, config()};
   auto err = co_await client.async_connect();
   REQUIRE(!err);
 
   co_return client;
 }
 
-static boost::asio::awaitable<ClientType> get_verifier(boost::asio::any_io_executor exe)
+boost::asio::awaitable<std::shared_ptr<ClientType>> get_verifier(boost::asio::any_io_executor exe)
 {
-  auto client = ClientType{exe, config};
-  auto err = co_await client.async_connect();
+  auto client = std::make_shared<ClientType>(exe, config());
+  auto err = co_await client->async_connect();
   REQUIRE(!err);
 
   auto sub_topics = std::vector<TopicSubopts>{
@@ -30,16 +58,16 @@ static boost::asio::awaitable<ClientType> get_verifier(boost::asio::any_io_execu
       {default_component_availability_topic(Cover::Defs::Component, UniqueId), QoS::at_most_once}
   };
 
-  err = co_await client.async_subscribe(sub_topics);
+  err = co_await client->async_subscribe(sub_topics);
   REQUIRE(!err);
 
   co_return client;
 }
 
 template <typename T>
-boost::asio::awaitable<T> async_recv_packet(ClientType& client)
+boost::asio::awaitable<T> async_recv_packet(std::shared_ptr<ClientType> client)
 {
-  auto res = co_await client.async_recv();
+  auto res = co_await client->async_recv();
   REQUIRE(res.has_value());
 
   auto* packet = res->template get_if<T>();
@@ -47,6 +75,7 @@ boost::asio::awaitable<T> async_recv_packet(ClientType& client)
 
   co_return *packet;
 }
+} // namespace
 
 TEST_CASE("Cover provides all required options during discovery", "[cover]")
 {
@@ -55,7 +84,9 @@ TEST_CASE("Cover provides all required options during discovery", "[cover]")
   auto strand = boost::asio::make_strand(io);
   boost::asio::co_spawn(
       strand,
-      [&]() mutable -> boost::asio::awaitable<void> {
+      // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+      // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
+      [strand](this auto /* self */) -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         // clang-format off
@@ -74,8 +105,9 @@ TEST_CASE("Cover provides all required options during discovery", "[cover]")
         REQUIRE(!pobj.as_object()[Cover::Opt::CommandTopic.key].as_string().empty());
 
         co_await cover.async_close();
-        co_await verifier_client.async_close();
+        co_await verifier_client->async_close();
       },
+      // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
       rethrow);
 
   io.run();
@@ -86,26 +118,30 @@ TEST_CASE("Cover can receive commands", "[cover]")
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
+  static constexpr auto default_delay = std::chrono::milliseconds{100};
 
   boost::asio::co_spawn(
       strand,
-      [&]() mutable -> boost::asio::awaitable<void> {
+      // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+      // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
+      [&, strand](this auto /* self */) -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
 
-        std::string received_command;
+        auto received_command = std::make_shared<std::string>();
+
         // clang-format off
         auto cover = Factory<Cover>(UniqueId, std::move(entity_client))
-          .on_open([&]() -> boost::asio::awaitable<void> {
-                           received_command = "OPEN";
+          .on_open([received_command](this auto /* self */) -> boost::asio::awaitable<void> {
+                           *received_command = "OPEN";
                            co_return;
                          })
-          .on_close([&]() -> boost::asio::awaitable<void> {
-                           received_command = "CLOSE";
+          .on_close([received_command](this auto /* self */) -> boost::asio::awaitable<void> {
+                           *received_command = "CLOSE";
                            co_return;
                          })
-          .on_stop([&]() -> boost::asio::awaitable<void> {
-                           received_command = "STOP";
+          .on_stop([received_command](this auto /* self */) -> boost::asio::awaitable<void> {
+                           *received_command = "STOP";
                            co_return;
                          })
           .create();
@@ -120,46 +156,47 @@ TEST_CASE("Cover can receive commands", "[cover]")
 
         SECTION("OPEN command")
         {
-          auto err_pub = co_await verifier_client.async_publish(
+          auto err_pub = co_await verifier_client->async_publish(
               default_component_command_topic(Cover::Defs::Component, UniqueId),
               Cover::Defs::PayloadOpen);
           REQUIRE(!err_pub);
 
           auto timer = boost::asio::steady_timer{strand};
-          timer.expires_after(std::chrono::milliseconds(100));
+          timer.expires_after(default_delay);
           co_await timer.async_wait(boost::asio::use_awaitable);
-          REQUIRE(received_command == "OPEN");
+          REQUIRE(*received_command == "OPEN");
         }
 
         SECTION("CLOSE command")
         {
-          auto err_pub = co_await verifier_client.async_publish(
+          auto err_pub = co_await verifier_client->async_publish(
               default_component_command_topic(Cover::Defs::Component, UniqueId),
               Cover::Defs::PayloadClose);
           REQUIRE(!err_pub);
 
           auto timer = boost::asio::steady_timer{strand};
-          timer.expires_after(std::chrono::milliseconds(100));
+          timer.expires_after(default_delay);
           co_await timer.async_wait(boost::asio::use_awaitable);
-          REQUIRE(received_command == "CLOSE");
+          REQUIRE(*received_command == "CLOSE");
         }
 
         SECTION("STOP command")
         {
-          auto err_pub = co_await verifier_client.async_publish(
+          auto err_pub = co_await verifier_client->async_publish(
               default_component_command_topic(Cover::Defs::Component, UniqueId),
               Cover::Defs::PayloadStop);
           REQUIRE(!err_pub);
 
           auto timer = boost::asio::steady_timer{strand};
-          timer.expires_after(std::chrono::milliseconds(100));
+          timer.expires_after(default_delay);
           co_await timer.async_wait(boost::asio::use_awaitable);
-          REQUIRE(received_command == "STOP");
+          REQUIRE(*received_command == "STOP");
         }
 
         co_await cover.async_close();
-        co_await verifier_client.async_close();
+        co_await verifier_client->async_close();
       },
+      // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
       rethrow);
 
   io.run();
@@ -173,7 +210,9 @@ TEST_CASE("Cover state update", "[cover]")
 
   boost::asio::co_spawn(
       strand,
-      [&]() mutable -> boost::asio::awaitable<void> {
+      // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+      // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
+      [strand](this auto /* self */) -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         // clang-format off
@@ -197,8 +236,9 @@ TEST_CASE("Cover state update", "[cover]")
         REQUIRE(packet.payload() == Cover::Defs::StateOpen);
 
         co_await cover.async_close();
-        co_await verifier_client.async_close();
+        co_await verifier_client->async_close();
       },
+      // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
       rethrow);
 
   io.run();

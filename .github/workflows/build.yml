@@ -18,17 +18,17 @@ jobs:
       matrix:
         include:
           - preset: linux-native-conan-gcc-debug
-            image: bicompb/cpp-gcc-13
+            image: bicompb/cpp-gcc-14
           - preset: linux-native-conan-gcc-release
-            image: bicompb/cpp-gcc-13
+            image: bicompb/cpp-gcc-14
           - preset: linux-native-conan-clang-debug
             image: bicompb/cpp-clang-19
           - preset: linux-native-conan-clang-release
             image: bicompb/cpp-clang-19
           - preset: linux-native-conan-gcc-debug-asan
-            image: bicompb/cpp-gcc-13
+            image: bicompb/cpp-gcc-14
           - preset: linux-native-conan-gcc-debug-tsan
-            image: bicompb/cpp-gcc-13
+            image: bicompb/cpp-gcc-14
     steps:
       - name: Checkout code
         uses: actions/checkout@v6

@@ -1,11 +1,13 @@
-#include <async_mqtt/all.hpp>
+#include <async_mqtt/util/log_severity.hpp>
+#include <async_mqtt/util/setup_log.hpp>
 
 #include <catch2/catch_session.hpp>
+#include <spdlog/common.h>
 #include <spdlog/spdlog.h>
 
 // #include "helpers/test_setup.hpp"
 // #include "helpers/test_config.hpp"
-
+// NOLINTNEXTLINE(misc-use-internal-linkage): weak hook must keep external linkage so tests can override it.
 __attribute__((weak)) void test_spec_setup()
 {
   //  throw std::runtime_error{ "dupa" };
@@ -14,8 +16,6 @@ __attribute__((weak)) void test_spec_setup()
 int main(int argc, char* argv[])
 {
   async_mqtt::setup_log(async_mqtt::severity_level::trace);
-  using namespace Catch::Clara;
-
   auto session = Catch::Session{};
 
   // auto& config = TestConfig::get();
@@ -24,9 +24,9 @@ int main(int argc, char* argv[])
 
   spdlog::set_level(spdlog::level::debug);
 
-  int returnCode = session.applyCommandLine(argc, argv);
-  if (returnCode != 0) { // Indicates a command line error
-    return returnCode;
+  int return_code = session.applyCommandLine(argc, argv);
+  if (return_code != 0) { // Indicates a command line error
+    return return_code;
   }
 
   return session.run(argc, argv);
