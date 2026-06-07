@@ -85,7 +85,9 @@ TEST_CASE("Cover provides all required options during discovery", "[cover]")
   auto strand = boost::asio::make_strand(io);
   boost::asio::co_spawn(
       strand,
-      [strand]() mutable -> boost::asio::awaitable<void> {
+      // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+      // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
+      [strand](this auto /* self */) -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         // clang-format off
@@ -106,6 +108,7 @@ TEST_CASE("Cover provides all required options during discovery", "[cover]")
         co_await cover.async_close();
         co_await verifier_client->async_close();
       },
+      // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
       rethrow);
 
   io.run();
@@ -122,7 +125,7 @@ TEST_CASE("Cover can receive commands", "[cover]")
       strand,
       // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
       // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
-      [strand, &catchInternalSectionHint](this auto /* self */) -> boost::asio::awaitable<void> {
+      [&, strand](this auto /* self */) -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
 
@@ -210,7 +213,7 @@ TEST_CASE("Cover state update", "[cover]")
       strand,
       // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
       // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
-      [strand, &catchInternalSectionHint](this auto /* self */) -> boost::asio::awaitable<void> {
+      [strand](this auto /* self */) -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         // clang-format off

@@ -75,7 +75,7 @@ class Cover : protected Entity<Cover>
     return config_.cfg;
   }
 
-  boost::asio::awaitable<Error> async_update_state(const std::string& state)
+  boost::asio::awaitable<Error> async_update_state(std::string state)
   {
     if (!config_.cfg.contains(Opt::StateTopic)) {
       co_return ErrorCode::InvalidConfig;
@@ -84,7 +84,7 @@ class Cover : protected Entity<Cover>
     co_return co_await async_publish(config_.cfg[Opt::StateTopic], state, config_.qos);
   }
 
-  public:
+public:
   boost::asio::awaitable<Error> async_run()
   {
     while (true) {
@@ -98,19 +98,8 @@ class Cover : protected Entity<Cover>
         if constexpr (std::is_same_v<PacketType, async_mqtt::v5::publish_packet>) {
           if (packet.topic() == config_.cfg[Opt::CommandTopic]) {
             auto payload = packet.payload();
-            if (payload == config_.cfg[Opt::PayloadOpen]) {
-              if (config_.on_open) {
-                boost::asio::co_spawn(executor(), config_.on_open(), boost::asio::detached);
-              }
-            } else if (payload == config_.cfg[Opt::PayloadClose]) {
-              if (config_.on_close) {
-                boost::asio::co_spawn(executor(), config_.on_close(), boost::asio::detached);
-              }
-            } else if (payload == config_.cfg[Opt::PayloadStop]) {
-              if (config_.on_stop) {
-                boost::asio::co_spawn(executor(), config_.on_stop(), boost::asio::detached);
-              }
-            }
+            auto cmd = std::string_view{payload.data(), payload.size()};
+            dispatch(cmd);
           }
         }
       });
@@ -119,7 +108,24 @@ class Cover : protected Entity<Cover>
     co_return ErrorCode::Success;
   }
 
-  protected:
+protected:
+  void dispatch(std::string_view cmd)
+  {
+    if (cmd == config_.cfg[Opt::PayloadOpen]) {
+      if (config_.on_open) {
+        boost::asio::co_spawn(executor(), config_.on_open(), boost::asio::detached);
+      }
+    } else if (cmd == config_.cfg[Opt::PayloadClose]) {
+      if (config_.on_close) {
+        boost::asio::co_spawn(executor(), config_.on_close(), boost::asio::detached);
+      }
+    } else if (cmd == config_.cfg[Opt::PayloadStop]) {
+      if (config_.on_stop) {
+        boost::asio::co_spawn(executor(), config_.on_stop(), boost::asio::detached);
+      }
+    }
+  }
+
   boost::asio::awaitable<Error> async_update_availability_impl(bool state)
   {
     /*

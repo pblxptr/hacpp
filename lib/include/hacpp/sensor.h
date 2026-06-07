@@ -88,7 +88,7 @@ class Sensor : protected Entity<Sensor>
         config_.qos);
   }
 
-  boost::asio::awaitable<Error> async_subscribe_impl()
+  boost::asio::awaitable<Error> async_subscribe_impl()  // NOLINT(readability-convert-member-functions-to-static)
   {
     co_return Error{};
   }

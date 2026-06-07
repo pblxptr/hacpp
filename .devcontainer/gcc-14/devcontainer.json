@@ -1,0 +1,19 @@
+{
+  "name": "gcc-14",
+  "image": "bicompb/cpp-gcc-14",
+  "postStartCommand": "conan remote add mygitlab https://gitlab.com/api/v4/projects/75478887/packages/conan",
+  "mounts": [
+    "source=${localEnv:HOME}/.conan2/p,target=/home/vscode/.conan2/p,type=bind"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cpptools-extension-pack",
+        "ms-vscode.cmake-tools",
+        "google.geminicodeassis",
+        "openai.chatgpt"
+      ]
+    }
+  }
+}

@@ -81,7 +81,7 @@ TEST_CASE("Binary sensor provides all required options during discovery", "[bina
       strand,
       // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
       // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
-      [strand, &catchInternalSectionHint](this auto /* self */) -> boost::asio::awaitable<void> {
+      [strand](this auto /* self */) -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         // clang-format off
@@ -120,7 +120,7 @@ TEST_CASE("Binary sensor can update its state", "[binary_sensor]")
       strand,
       // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
       // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
-      [strand, &catchInternalSectionHint](this auto /* self */) -> boost::asio::awaitable<void> {
+      [&, strand](this auto /* self */) -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         // clang-format off
@@ -178,7 +178,7 @@ TEST_CASE("Binary sensor can update its availability", "[binary_sensor]")
       strand,
       // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
       // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
-      [strand, &catchInternalSectionHint](this auto /* self */) mutable -> boost::asio::awaitable<void> {
+      [&, strand](this auto /* self */) -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         // clang-format off
