@@ -1,9 +1,9 @@
 #include "config.h"
 
 #include <hacpp/async_mqtt_client.h>
+#include <hacpp/cover.h>
 #include <hacpp/entity.h>
 #include <hacpp/hacpp.h>
-#include <hacpp/cover.h>
 
 #include <boost/asio/any_io_executor.hpp>
 #include <boost/asio/awaitable.hpp>
@@ -25,14 +25,14 @@ namespace {
 
 using hacpp::mqtt::ClientType;
 using hacpp::mqtt::Cover;
-using hacpp::mqtt::Factory;
-using hacpp::mqtt::PublishPacket;
-using hacpp::mqtt::QoS;
-using hacpp::mqtt::TopicSubopts;
 using hacpp::mqtt::default_component_availability_topic;
 using hacpp::mqtt::default_component_command_topic;
 using hacpp::mqtt::default_component_discovery_topic;
 using hacpp::mqtt::default_component_state_topic;
+using hacpp::mqtt::Factory;
+using hacpp::mqtt::PublishPacket;
+using hacpp::mqtt::QoS;
+using hacpp::mqtt::TopicSubopts;
 
 constexpr auto UniqueId = "cover_unique_id";
 
@@ -77,7 +77,6 @@ boost::asio::awaitable<T> async_recv_packet(std::shared_ptr<ClientType> client)
 }
 } // namespace
 
-
 TEST_CASE("Cover provides all required options during discovery", "[cover]")
 {
   // Arrange
@@ -119,7 +118,7 @@ TEST_CASE("Cover can receive commands", "[cover]")
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
-  constexpr static auto default_delay = std::chrono::milliseconds{100};
+  static constexpr auto default_delay = std::chrono::milliseconds{100};
 
   boost::asio::co_spawn(
       strand,

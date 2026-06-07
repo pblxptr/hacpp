@@ -1,5 +1,6 @@
 #include "config.h"
 
+#include <async_mqtt/protocol/packet/qos.hpp>
 #include <hacpp/async_mqtt_client.h>
 #include <hacpp/error.h>
 
@@ -10,7 +11,6 @@
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/strand.hpp>
 #include <boost/asio/use_awaitable.hpp>
-#include <async_mqtt/protocol/packet/qos.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <spdlog/spdlog.h>
 

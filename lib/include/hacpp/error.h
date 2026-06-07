@@ -41,36 +41,36 @@ namespace hacpp::mqtt {
 
 class ErrorCategory : public boost::system::error_category
 {
-public:
-  ErrorCategory() = default;
-  virtual ~ErrorCategory() = default;
-  ErrorCategory(const ErrorCategory&) = delete;
-  ErrorCategory& operator=(const ErrorCategory&) = delete;
-  ErrorCategory(ErrorCategory&&) = delete;
-  ErrorCategory& operator=(ErrorCategory&&) = delete;
+  public:
+    ErrorCategory() = default;
+    virtual ~ErrorCategory() = default;
+    ErrorCategory(const ErrorCategory&) = delete;
+    ErrorCategory& operator=(const ErrorCategory&) = delete;
+    ErrorCategory(ErrorCategory&&) = delete;
+    ErrorCategory& operator=(ErrorCategory&&) = delete;
 
-  const char* name() const noexcept override
-  {
-    return "hacpp::mqtt";
-  }
-
-  std::string message(int ev) const override
-  {
-    switch (static_cast<ErrorCode>(ev)) {
-      case ErrorCode::Success:                return "success";
-      case ErrorCode::NotAuthorized:          return "not_authorized";
-      case ErrorCode::HostNotFound:           return "host_not_found";
-      case ErrorCode::ConnectionRefused:      return "connection_refused";
-      case ErrorCode::PacketNotAllowedToSend: return "packet_not_allowed_to_send";
-      case ErrorCode::NotConnected:           return "not_connected";
-      case ErrorCode::InvalidConfig:          return "invalid_config";
-      case ErrorCode::SessionLost:            return "session_lost";
-      case ErrorCode::InternalError:          return "internal_error";
-      case ErrorCode::InvalidPacket:          return "invalid_packet";
-      case ErrorCode::UnknownError:           return "unknown_error";
-      default:                                return "TODO(pbie): Handle error";
+    const char* name() const noexcept override
+    {
+      return "hacpp::mqtt";
     }
-  }
+
+    std::string message(int ev) const override
+    {
+      switch (static_cast<ErrorCode>(ev)) {
+        case ErrorCode::Success:                return "success";
+        case ErrorCode::NotAuthorized:          return "not_authorized";
+        case ErrorCode::HostNotFound:           return "host_not_found";
+        case ErrorCode::ConnectionRefused:      return "connection_refused";
+        case ErrorCode::PacketNotAllowedToSend: return "packet_not_allowed_to_send";
+        case ErrorCode::NotConnected:           return "not_connected";
+        case ErrorCode::InvalidConfig:          return "invalid_config";
+        case ErrorCode::SessionLost:            return "session_lost";
+        case ErrorCode::InternalError:          return "internal_error";
+        case ErrorCode::InvalidPacket:          return "invalid_packet";
+        case ErrorCode::UnknownError:           return "unknown_error";
+        default:                                return "TODO(pbie): Handle error";
+      }
+    }
 };
 
 inline const boost::system::error_category& error_category()

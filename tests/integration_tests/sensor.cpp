@@ -21,14 +21,14 @@ namespace {
 
 using hacpp::mqtt::Availability;
 using hacpp::mqtt::ClientType;
+using hacpp::mqtt::default_component_availability_topic;
+using hacpp::mqtt::default_component_discovery_topic;
+using hacpp::mqtt::default_component_state_topic;
 using hacpp::mqtt::Factory;
 using hacpp::mqtt::PublishPacket;
 using hacpp::mqtt::QoS;
 using hacpp::mqtt::Sensor;
 using hacpp::mqtt::TopicSubopts;
-using hacpp::mqtt::default_component_availability_topic;
-using hacpp::mqtt::default_component_discovery_topic;
-using hacpp::mqtt::default_component_state_topic;
 
 constexpr auto UniqueId = "sensor_unique_id";
 

@@ -1,9 +1,9 @@
 #include "config.h"
 
 #include <hacpp/async_mqtt_client.h>
+#include <hacpp/binary_sensor.h>
 #include <hacpp/entity.h>
 #include <hacpp/hacpp.h>
-#include <hacpp/binary_sensor.h>
 
 #include <boost/asio/any_io_executor.hpp>
 #include <boost/asio/awaitable.hpp>
@@ -22,13 +22,13 @@ namespace {
 using hacpp::mqtt::Availability;
 using hacpp::mqtt::BinarySensor;
 using hacpp::mqtt::ClientType;
+using hacpp::mqtt::default_component_availability_topic;
+using hacpp::mqtt::default_component_discovery_topic;
+using hacpp::mqtt::default_component_state_topic;
 using hacpp::mqtt::Factory;
 using hacpp::mqtt::PublishPacket;
 using hacpp::mqtt::QoS;
 using hacpp::mqtt::TopicSubopts;
-using hacpp::mqtt::default_component_availability_topic;
-using hacpp::mqtt::default_component_discovery_topic;
-using hacpp::mqtt::default_component_state_topic;
 
 constexpr auto UniqueId = "binary_sensor_unique_id";
 
