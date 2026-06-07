@@ -1,26 +1,50 @@
 #include "config.h"
 
+#include <hacpp/async_mqtt_client.h>
+#include <hacpp/entity.h>
+#include <hacpp/hacpp.h>
 #include <hacpp/sensor.h>
 
-#include <catch2/catch_all.hpp>
+#include <boost/asio/any_io_executor.hpp>
+#include <boost/asio/awaitable.hpp>
+#include <boost/asio/impl/co_spawn.hpp>
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/strand.hpp>
+#include <boost/json/parse.hpp>
+#include <catch2/catch_test_macros.hpp>
 
-using namespace hacpp::mqtt;
+#include <memory>
+#include <utility>
+#include <vector>
 
-static constexpr auto UniqueId = "sensor_unique_id";
+namespace {
 
-static boost::asio::awaitable<ClientType> get_client(boost::asio::any_io_executor exe)
+using hacpp::mqtt::Availability;
+using hacpp::mqtt::ClientType;
+using hacpp::mqtt::Factory;
+using hacpp::mqtt::PublishPacket;
+using hacpp::mqtt::QoS;
+using hacpp::mqtt::Sensor;
+using hacpp::mqtt::TopicSubopts;
+using hacpp::mqtt::default_component_availability_topic;
+using hacpp::mqtt::default_component_discovery_topic;
+using hacpp::mqtt::default_component_state_topic;
+
+constexpr auto UniqueId = "sensor_unique_id";
+
+boost::asio::awaitable<ClientType> get_client(boost::asio::any_io_executor exe)
 {
-  auto client = ClientType{exe, config};
+  auto client = ClientType{exe, config()};
   auto err = co_await client.async_connect();
   REQUIRE(!err);
 
   co_return client;
 }
 
-static boost::asio::awaitable<ClientType> get_verifier(boost::asio::any_io_executor exe)
+boost::asio::awaitable<std::shared_ptr<ClientType>> get_verifier(boost::asio::any_io_executor exe)
 {
-  auto client = ClientType{exe, config};
-  auto err = co_await client.async_connect();
+  auto client = std::make_shared<ClientType>(exe, config());
+  auto err = co_await client->async_connect();
   REQUIRE(!err);
 
   auto sub_topics = std::vector<TopicSubopts>{
@@ -29,16 +53,16 @@ static boost::asio::awaitable<ClientType> get_verifier(boost::asio::any_io_execu
       {default_component_availability_topic(Sensor::Defs::Component, UniqueId), QoS::at_most_once}
   };
 
-  err = co_await client.async_subscribe(sub_topics);
+  err = co_await client->async_subscribe(sub_topics);
   REQUIRE(!err);
 
   co_return client;
 }
 
 template <typename T>
-boost::asio::awaitable<T> async_recv_packet(ClientType& client)
+boost::asio::awaitable<T> async_recv_packet(std::shared_ptr<ClientType> client)
 {
-  auto res = co_await client.async_recv();
+  auto res = co_await client->async_recv();
   REQUIRE(res.has_value());
 
   auto* packet = res->template get_if<T>();
@@ -46,6 +70,7 @@ boost::asio::awaitable<T> async_recv_packet(ClientType& client)
 
   co_return *packet;
 }
+} // namespace
 
 TEST_CASE("Sensor provides all required options during discovery", "[sensor]")
 {
@@ -54,7 +79,9 @@ TEST_CASE("Sensor provides all required options during discovery", "[sensor]")
   auto strand = boost::asio::make_strand(io);
   boost::asio::co_spawn(
       strand,
-      [&]() mutable -> boost::asio::awaitable<void> {
+      // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+      // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
+      [strand, &catchInternalSectionHint](this auto /* self */) -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         // clang-format off
@@ -73,8 +100,9 @@ TEST_CASE("Sensor provides all required options during discovery", "[sensor]")
         REQUIRE(!pobj.as_object()[Sensor::Opt::StateTopic.key].as_string().empty());
 
         co_await sensor.async_close();
-        co_await verifier_client.async_close();
+        co_await verifier_client->async_close();
       },
+      // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
       rethrow);
 
   io.run();
@@ -88,7 +116,9 @@ TEST_CASE("Sensor can update its state", "[sensor]")
 
   boost::asio::co_spawn(
       strand,
-      [&]() mutable -> boost::asio::awaitable<void> {
+      // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+      // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
+      [strand, &catchInternalSectionHint](this auto /* self */) -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         // clang-format off
@@ -109,8 +139,9 @@ TEST_CASE("Sensor can update its state", "[sensor]")
         REQUIRE(packet.payload() == "12.5");
 
         co_await sensor.async_close();
-        co_await verifier_client.async_close();
+        co_await verifier_client->async_close();
       },
+      // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
       rethrow);
 
   io.run();
@@ -124,7 +155,9 @@ TEST_CASE("Sensor availability", "[sensor]")
 
   boost::asio::co_spawn(
       strand,
-      [&]() mutable -> boost::asio::awaitable<void> {
+      // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+      // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
+      [strand, &catchInternalSectionHint](this auto /* self */) -> boost::asio::awaitable<void> {
         auto entity_client = co_await get_client(strand);
         auto verifier_client = co_await get_verifier(strand);
         // clang-format off
@@ -163,8 +196,9 @@ TEST_CASE("Sensor availability", "[sensor]")
         }
 
         co_await sensor.async_close();
-        co_await verifier_client.async_close();
+        co_await verifier_client->async_close();
       },
+      // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
       rethrow);
 
   io.run();

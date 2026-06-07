@@ -15,12 +15,13 @@ enum class ErrorCode
   NotAuthorized,          /* E.g credentials */
   HostNotFound,           /* E.g. host doe not exist*/
   ConnectionRefused,      /* E.g. host listens on a different port */
-  PacketNotAllowedToSend, // TODO: Perhaps too specific?
+  PacketNotAllowedToSend, // TODO(pbiel): Perhaps too specific?
   NotConnected,           /* Not connected */
   InvalidConfig,          /* Invaid config */
   Disconnected,           /* Disconnected */
   SessionLost,            /* When client reconnected but the session is lost */
   InternalError,          /* Internal error, e.g., logic error, invalid state, etc. */
+  InvalidPacket,          /* Received invalid packet */
   UnknownError
 };
 
@@ -40,7 +41,14 @@ namespace hacpp::mqtt {
 
 class ErrorCategory : public boost::system::error_category
 {
-  public:
+public:
+  ErrorCategory() = default;
+  virtual ~ErrorCategory() = default;
+  ErrorCategory(const ErrorCategory&) = delete;
+  ErrorCategory& operator=(const ErrorCategory&) = delete;
+  ErrorCategory(ErrorCategory&&) = delete;
+  ErrorCategory& operator=(ErrorCategory&&) = delete;
+
   const char* name() const noexcept override
   {
     return "hacpp::mqtt";
@@ -58,8 +66,9 @@ class ErrorCategory : public boost::system::error_category
       case ErrorCode::InvalidConfig:          return "invalid_config";
       case ErrorCode::SessionLost:            return "session_lost";
       case ErrorCode::InternalError:          return "internal_error";
+      case ErrorCode::InvalidPacket:          return "invalid_packet";
       case ErrorCode::UnknownError:           return "unknown_error";
-      default:                                return "unknown_error";
+      default:                                return "TODO(pbie): Handle error";
     }
   }
 };
@@ -95,10 +104,11 @@ inline ErrorCode map_netdb_error(int ev)
 
 inline ErrorCode map_misc_error(int ev)
 {
-  switch (ev) {
-    case boost::asio::error::eof: return ErrorCode::Disconnected;
-    default:                      return ErrorCode::UnknownError;
+  if (ev == boost::asio::error::eof) {
+    return ErrorCode::Disconnected;
   }
+
+  return ErrorCode::UnknownError;
 }
 
 inline ErrorCode map_system_error(int ev)

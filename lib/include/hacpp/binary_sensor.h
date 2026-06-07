@@ -8,13 +8,14 @@
 #include <boost/json.hpp>
 
 #include <string>
+#include <utility>
 
 namespace hacpp::mqtt {
 
 class BinarySensor : protected Entity<BinarySensor>
 {
   using Base = Entity<BinarySensor>;
-  friend Base;
+  friend Base; // TODO(pbiel): Do I need this? Perhaps friend in base is enough
 
   public:
   using Base::async_close;
@@ -52,7 +53,7 @@ class BinarySensor : protected Entity<BinarySensor>
       , config_(std::move(config))
   {}
 
-  const EntityCfg& config() const
+  [[nodiscard]] const EntityCfg& config() const
   {
     return config_.cfg;
   }
@@ -120,8 +121,8 @@ template <>
 class Factory<BinarySensor>
 {
   public:
-  Factory(const std::string& unique_id, ClientType client)
-      : unique_id_(unique_id)
+  Factory(std::string unique_id, ClientType client)
+      : unique_id_(std::move(unique_id))
       , client_(std::move(client))
   {}
 

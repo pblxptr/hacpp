@@ -14,6 +14,11 @@ namespace hacpp::mqtt {
 
 struct Property
 {
+  constexpr explicit Property(std::string_view key, std::string_view obj_key = {})
+      : key{key}
+      , obj_key{obj_key}
+  {}
+
   std::string_view key;
   std::string_view obj_key;
 };
@@ -53,10 +58,10 @@ struct Availability
 
 class EntityCfg
 {
-  public:
+public:
   EntityCfg(std::initializer_list<std::pair<Property, std::string>> init)
   {
-    for (auto [prop, value] : init) {
+    for (const auto& [prop, value] : init) {
       set(prop, value);
     }
   }
@@ -86,7 +91,7 @@ class EntityCfg
     return boost::json::value_to<std::string>(obj_[prop.obj_key].as_object()[prop.key]);
   }
 
-  auto at(const Property& prop) const
+  [[nodiscard]] auto at(const Property& prop) const
   {
     if (prop.obj_key.empty()) {
       return boost::json::value_to<std::string>(obj_.at(prop.key));
@@ -100,7 +105,7 @@ class EntityCfg
     // obj_["device"] = boost::json::serialize(device);
   }
 
-  bool contains(const Property& prop) const
+  [[nodiscard]] bool contains(const Property& prop) const
   {
     if (prop.obj_key.empty()) {
       return obj_.contains(prop.key);
@@ -109,7 +114,7 @@ class EntityCfg
     return obj_.contains(prop.obj_key) && obj_.at(prop.obj_key).as_object().contains(prop.key);
   }
 
-  auto json() const
+  [[nodiscard]] auto json() const
   {
     return boost::json::serialize(obj_);
   }
@@ -121,11 +126,11 @@ class EntityCfg
 template <typename Impl>
 class Entity
 {
-  public:
   explicit Entity(ClientType client)
       : client_{std::move(client)}
   {}
-
+  friend Impl;
+public:
   auto executor()
   {
     return client_.executor();
@@ -162,14 +167,14 @@ class Entity
   }
 
   template <typename... Args>
-  boost::asio::awaitable<Error> async_publish(Args&&... args)
+  boost::asio::awaitable<Error> async_publish(Args... args)
   {
-    co_return co_await client_.async_publish(std::forward<Args>(args)...);
+    co_return co_await client_.async_publish(std::move(args)...);
   }
 
-  boost::asio::awaitable<Error> async_subscribe(const std::vector<TopicSubopts>& sub_entry)
+  boost::asio::awaitable<Error> async_subscribe(std::vector<TopicSubopts> sub_entry)
   {
-    co_return co_await client_.async_subscribe(sub_entry);
+    co_return co_await client_.async_subscribe(std::move(sub_entry));
   }
 
   boost::asio::awaitable<RecvResult> async_recv()
@@ -198,7 +203,7 @@ class Entity
     return static_cast<Impl&>(*this);
   }
 
-  boost::asio::awaitable<Error> handle_err(const Error& err)
+  boost::asio::awaitable<Error> handle_err(Error err)
   {
     if (err != ErrorCode::SessionLost) {
       co_return err;

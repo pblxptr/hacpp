@@ -11,6 +11,7 @@
 
 #include <functional>
 #include <string>
+#include <utility>
 
 namespace hacpp::mqtt {
 
@@ -69,7 +70,7 @@ class Cover : protected Entity<Cover>
       , config_(std::move(config))
   {}
 
-  const EntityCfg& config() const
+  [[nodiscard]] const EntityCfg& config() const
   {
     return config_.cfg;
   }
@@ -122,7 +123,7 @@ class Cover : protected Entity<Cover>
   boost::asio::awaitable<Error> async_update_availability_impl(bool state)
   {
     /*
-      TODO:
+      TODO(pbiel):
         - Move the implementation to Entity
         - Some of entities do not require awailability so allow to succeed when it is not mandatory
         - Bear in mind the Success is returned here, this is valid for Cover, not for the rest of entities
@@ -171,8 +172,8 @@ template <>
 class Factory<Cover>
 {
   public:
-  Factory(const std::string& unique_id, ClientType client)
-      : unique_id_(unique_id)
+  Factory(std::string unique_id, ClientType client)
+      : unique_id_(std::move(unique_id))
       , client_(std::move(client))
   {}
 

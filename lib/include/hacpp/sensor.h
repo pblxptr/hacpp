@@ -8,6 +8,7 @@
 #include <boost/json.hpp>
 
 #include <string>
+#include <utility>
 
 namespace hacpp::mqtt {
 
@@ -47,14 +48,14 @@ class Sensor : protected Entity<Sensor>
       , config_(std::move(config))
   {}
 
-  const EntityCfg& config() const
+  [[nodiscard]] const EntityCfg& config() const
   {
     return config_.cfg;
   }
 
-  boost::asio::awaitable<Error> async_update_state(const std::string& state)
+  boost::asio::awaitable<Error> async_update_state(std::string state)
   {
-    co_return co_await async_publish(config_.cfg[Opt::StateTopic], state, config_.qos);
+    co_return co_await async_publish(config_.cfg[Opt::StateTopic], std::move(state), config_.qos);
   }
 
   protected:
@@ -112,8 +113,8 @@ template <>
 class Factory<Sensor>
 {
   public:
-  Factory(const std::string& unique_id, ClientType client)
-      : unique_id_(unique_id)
+  Factory(std::string unique_id, ClientType client)
+      : unique_id_(std::move(unique_id))
       , client_(std::move(client))
   {}
 

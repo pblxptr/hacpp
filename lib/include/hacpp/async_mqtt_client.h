@@ -7,7 +7,10 @@
 
 #include <cstdint>
 #include <expected>
+#include <optional>
+#include <sstream>
 #include <string>
+#include <utility>
 
 namespace hacpp::mqtt {
 using Error = boost::system::error_code;
@@ -17,7 +20,7 @@ using QoS = async_mqtt::qos;
 using RecvResult = std::expected<async_mqtt::packet_variant, Error>;
 using PublishPacket = async_mqtt::v5::publish_packet;
 
-// TODO: Use logger instance instead of global spdlog functions, and configure
+// TODO(pbiel): Use logger instance instead of global spdlog functions, and configure
 // it properly (e.g., set log level, format, sinks).
 
 namespace detail {
@@ -52,16 +55,15 @@ class AsyncMqttClient2
 
   struct Connection
   {
-    explicit Connection(boost::asio::any_io_executor exe)
-        : state{State::Closed}
-        , attempt{0}
-        , max_attempts{10}
-        , autorec_wait_timer{exe}
+    static constexpr auto DefaultMaxAutoreconnectAttemps = 10;
+
+    explicit Connection(const boost::asio::any_io_executor& exe)
+        : autorec_wait_timer{exe}
     {}
 
-    State state;
-    int attempt;
-    int max_attempts;
+    State state{State::Closed};
+    int attempt{0};
+    int max_attempts{DefaultMaxAutoreconnectAttemps};
     boost::asio::steady_timer autorec_wait_timer;
   };
 
@@ -70,16 +72,16 @@ class AsyncMqttClient2
   {
     std::string host{"localhost"};
     std::string port{"1883"};
-    std::string username{""};
-    std::string password{""};
-    std::string unique_id{""};
+    std::string username;
+    std::string password;
+    std::string unique_id;
     std::uint16_t keep_alive{0};
     bool clean_start{true};
   };
 
-  AsyncMqttClient2(boost::asio::any_io_executor exe, const Config& config)
+  AsyncMqttClient2(const boost::asio::any_io_executor& exe, Config config)
       : impl_{exe}
-      , config_{config}
+      , config_{std::move(config)}
       , conn_{exe}
   {}
 
@@ -139,16 +141,14 @@ class AsyncMqttClient2
     auto err = Error{};
     co_await impl_.async_close(boost::asio::redirect_error(boost::asio::use_awaitable, err));
 
-    // TODO: Consider calling disconnect first
+    // TODO(pbiel): Consider calling disconnect first
     conn_.state = State::Closed;
     conn_.autorec_wait_timer.cancel();
 
     co_return map_err(err);
   }
 
-  boost::asio::awaitable<Error> async_publish(
-      const std::string& topic,
-      const std::string& payload,
+  boost::asio::awaitable<Error> async_publish(std::string topic, std::string payload,
       async_mqtt::qos qos = async_mqtt::qos::at_most_once)
   {
     spdlog::debug("Publishing to topic: {}, payload: {}, QoS: {}", topic, payload, static_cast<int>(qos));
@@ -166,7 +166,7 @@ class AsyncMqttClient2
     auto pid = qos > QoS::at_most_once ? co_await impl_.async_acquire_unique_packet_id()
                                        : static_cast<async_mqtt::basic_packet_id_type<2>::type>(0);
     auto pubres = co_await impl_.async_publish(
-        async_mqtt::v5::publish_packet{pid, topic, payload, qos},
+        async_mqtt::v5::publish_packet{pid, std::move(topic), std::move(payload), qos},
         boost::asio::redirect_error(boost::asio::use_awaitable, err));
 
     spdlog::debug("Publish completed with error code: {} ({})", err.value(), err.message());
@@ -189,7 +189,7 @@ class AsyncMqttClient2
     co_return ErrorCode::Success;
   }
 
-  boost::asio::awaitable<Error> async_subscribe(const std::vector<TopicSubopts>& sub_entry)
+  boost::asio::awaitable<Error> async_subscribe(std::vector<TopicSubopts> sub_entry)
   {
     if (conn_.state == State::Reconnecting) {
       co_await async_wait_autoreconnect();
@@ -204,7 +204,7 @@ class AsyncMqttClient2
     auto pid_sub = co_await impl_.async_acquire_unique_packet_id();
     auto suback_opt = co_await impl_.async_subscribe(
         pid_sub,
-        sub_entry,
+        std::move(sub_entry),
         boost::asio::redirect_error(boost::asio::use_awaitable, err));
 
     if (err) {
@@ -226,6 +226,10 @@ class AsyncMqttClient2
     if (err) {
       auto err_rc = co_await async_handle_reconnect();
       co_return std::unexpected(err_rc);
+    }
+
+    if (!packet) {
+      co_return std::unexpected(ErrorCode::InvalidPacket);
     }
 
     packet->visit([](auto&& p) { spdlog::debug("Received packet: {}", detail::str(p)); });
