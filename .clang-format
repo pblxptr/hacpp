@@ -87,14 +87,14 @@ IncludeCategories:
   - Regex:           '"([A-Za-z0-9.\/_-])+"'
     Priority:        1
 IncludeIsMainRegex: '(Test)?$'
-IndentAccessModifiers: true
+IndentAccessModifiers: false
 IndentCaseBlocks: false
 IndentCaseLabels: true
 IndentExternBlock: NoIndent
 IndentGotoLabels: true
 IndentPPDirectives: BeforeHash
 IndentRequiresClause: false
-IndentWidth: 2
+IndentWidth: 4
 IndentWrappedFunctionNames: false
 InsertBraces: true
 InsertNewlineAtEOF: true

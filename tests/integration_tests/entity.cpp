@@ -5,7 +5,7 @@
 #include <hacpp/error.h>
 
 #include <boost/asio/awaitable.hpp>
-#include <boost/asio/co_spawn.hpp>
+#include <boost/asio/impl/co_spawn.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/strand.hpp>
@@ -29,6 +29,8 @@ using hacpp::mqtt::EntityCfg;
 using hacpp::mqtt::Error;
 using hacpp::mqtt::ErrorCode;
 using hacpp::mqtt::QoS;
+
+constexpr auto ReconnectTriggerDelay = std::chrono::milliseconds{500};
 
 struct SetupCounters
 {
@@ -70,6 +72,11 @@ class TestEntity : protected Entity<TestEntity>
       co_return ErrorCode::Success;
     }
 
+    boost::asio::awaitable<Error> async_update_availability_impl(bool /* state */)
+    {
+      co_return ErrorCode::Success;
+    }
+
   private:
     Config config_{.qos = QoS::at_most_once, .cfg = {}};
     std::shared_ptr<SetupCounters> counters_;
@@ -94,14 +101,17 @@ void run_proxy(const std::string& cmd)
 boost::asio::awaitable<void>
 wait_for_setup_replay(std::shared_ptr<SetupCounters> counters, int initial_discovery_calls, int initial_subscribe_calls)
 {
+  static constexpr auto default_delay = std::chrono::milliseconds{100};
+  static constexpr auto max_attempts = 30;
+
   auto timer = boost::asio::steady_timer{co_await boost::asio::this_coro::executor};
-  for (auto attempt = 0; attempt < 30; ++attempt) {
+  for (auto attempt = 0; attempt < max_attempts; ++attempt) {
     if (counters->discovery_calls == initial_discovery_calls + 1 &&
         counters->subscribe_calls == initial_subscribe_calls + 1) {
       co_return;
     }
 
-    timer.expires_after(std::chrono::milliseconds{100});
+    timer.expires_after(default_delay);
     co_await timer.async_wait(boost::asio::use_awaitable);
   }
 }
@@ -150,7 +160,7 @@ TEST_CASE("Entity calls setup again after client reconnect", "[entity][autorecon
             rethrow);
 
         auto timer = boost::asio::steady_timer{strand};
-        timer.expires_after(std::chrono::milliseconds{500});
+        timer.expires_after(ReconnectTriggerDelay);
         co_await timer.async_wait(boost::asio::use_awaitable);
 
         run_proxy("disconnect");
