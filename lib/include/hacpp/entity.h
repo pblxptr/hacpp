@@ -102,7 +102,40 @@ class EntityCfg
 
     void set(const Device& device)
     {
-      // obj_["device"] = boost::json::serialize(device);
+      auto json_device = boost::json::object{};
+
+      auto set_string = [&json_device](std::string_view key, const std::string& value) {
+        if (!value.empty()) {
+          json_device[key] = value;
+        }
+      };
+
+      auto set_string_array = [&json_device](std::string_view key, const std::vector<std::string>& values) {
+        if (values.empty()) {
+          return;
+        }
+
+        auto json_values = boost::json::array{};
+        for (const auto& value : values) {
+          json_values.emplace_back(value);
+        }
+        json_device[key] = std::move(json_values);
+      };
+
+      set_string("configuration_url", device.configuraton_url);
+      set_string_array("connections", device.connections);
+      set_string("hw_version", device.hw_version);
+      set_string_array("identifiers", device.identifiers);
+      set_string("manufacturer", device.manufacturer);
+      set_string("model", device.model);
+      set_string("model_id", device.model_id);
+      set_string("name", device.name);
+      set_string("serial_number", device.serial_number);
+      set_string("suggested_area", device.suggested_area);
+      set_string("sw_version", device.sw_version);
+      set_string("via_device", device.via_device);
+
+      obj_["device"] = std::move(json_device);
     }
 
     [[nodiscard]] bool contains(const Property& prop) const
@@ -164,7 +197,21 @@ class Entity
 
     boost::asio::awaitable<Error> async_update_availability(bool state)
     {
-      co_return co_await impl().async_update_availability_impl(state);
+      const auto& cfg = impl().config_.cfg;
+      if (!cfg.contains(Availability::Opt::Topic)) {
+        co_return ErrorCode::Success;
+      }
+
+      auto val = std::string{};
+      if (state) {
+        val = cfg.contains(Availability::Opt::PayloadAvailable) ? cfg.at(Availability::Opt::PayloadAvailable)
+                                                                : Availability::Defs::PayloadAvailable;
+      } else {
+        val = cfg.contains(Availability::Opt::PayloadNotAvailable) ? cfg.at(Availability::Opt::PayloadNotAvailable)
+                                                                   : Availability::Defs::PayloadNotAvailable;
+      }
+
+      co_return co_await async_publish(cfg.at(Availability::Opt::Topic), val, impl().config_.qos);
     }
 
     template <typename... Args>
@@ -206,11 +253,11 @@ class Entity
 
     boost::asio::awaitable<Error> handle_err(Error err)
     {
-      if (err != ErrorCode::SessionLost) {
-        co_return err;
+      if (err == ErrorCode::SessionLost) {
+        co_return co_await async_setup();
       }
 
-      co_return co_await async_setup();
+      co_return err;
     }
 
   private:

@@ -59,26 +59,6 @@ class Sensor : protected Entity<Sensor>
     }
 
   protected:
-    boost::asio::awaitable<Error> async_update_availability_impl(bool state)
-    {
-      if (!config_.cfg.contains(Availability::Opt::Topic)) {
-        co_return ErrorCode::Success;
-      }
-
-      auto val = std::string{};
-      if (state) {
-        val = config_.cfg.contains(Availability::Opt::PayloadAvailable)
-                ? config_.cfg[Availability::Opt::PayloadAvailable]
-                : Availability::Defs::PayloadAvailable;
-      } else {
-        val = config_.cfg.contains(Availability::Opt::PayloadNotAvailable)
-                ? config_.cfg[Availability::Opt::PayloadNotAvailable]
-                : Availability::Defs::PayloadNotAvailable;
-      }
-
-      co_return co_await async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
-    }
-
     boost::asio::awaitable<Error> async_discovery_impl()
     {
       auto json = config_.cfg.json();
