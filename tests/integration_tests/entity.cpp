@@ -91,10 +91,8 @@ void run_proxy(const std::string& cmd)
   }
 }
 
-boost::asio::awaitable<void> wait_for_setup_replay(
-    std::shared_ptr<SetupCounters> counters,
-    int initial_discovery_calls,
-    int initial_subscribe_calls)
+boost::asio::awaitable<void>
+wait_for_setup_replay(std::shared_ptr<SetupCounters> counters, int initial_discovery_calls, int initial_subscribe_calls)
 {
   auto timer = boost::asio::steady_timer{co_await boost::asio::this_coro::executor};
   for (auto attempt = 0; attempt < 30; ++attempt) {
