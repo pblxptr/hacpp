@@ -126,32 +126,6 @@ class Cover : protected Entity<Cover>
       }
     }
 
-    boost::asio::awaitable<Error> async_update_availability_impl(bool state)
-    {
-      /*
-        TODO(pbiel):
-          - Move the implementation to Entity
-          - Some of entities do not require awailability so allow to succeed when it is not mandatory
-          - Bear in mind the Success is returned here, this is valid for Cover, not for the rest of entities
-      */
-      if (!config_.cfg.contains(Availability::Opt::Topic)) {
-        co_return ErrorCode::Success;
-      }
-
-      auto val = std::string{};
-      if (state) {
-        val = config_.cfg.contains(Availability::Opt::PayloadAvailable)
-                ? config_.cfg[Availability::Opt::PayloadAvailable]
-                : Availability::Defs::PayloadAvailable;
-      } else {
-        val = config_.cfg.contains(Availability::Opt::PayloadNotAvailable)
-                ? config_.cfg[Availability::Opt::PayloadNotAvailable]
-                : Availability::Defs::PayloadNotAvailable;
-      }
-
-      co_return co_await async_publish(config_.cfg[Availability::Opt::Topic], val, config_.qos);
-    }
-
     boost::asio::awaitable<Error> async_discovery_impl()
     {
       auto json = config_.cfg.json();
