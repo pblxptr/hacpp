@@ -2,6 +2,7 @@ add_executable(hacpp-integration-tests
   test_main.cpp
   # test_spec_setup.cpp
   client_tests.cpp
+  entity.cpp
   binary_sensor.cpp
   sensor.cpp
   button.cpp

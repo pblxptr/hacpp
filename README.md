@@ -4,7 +4,7 @@
 [![Tests](https://github.com/pblxptr/hacpp/actions/workflows/tests.yml/badge.svg)](https://github.com/pblxptr/hacpp/actions/workflows/tests.yml)
 [![Quality](https://github.com/pblxptr/hacpp/actions/workflows/quality.yml/badge.svg)](https://github.com/pblxptr/hacpp/actions/workflows/quality.yml)
 
-hacpp is a resilient, thread-safe C++ library built on top of `async_mqtt` and `Boost.Asio` designed to manage Home Assistant entities via MQTT. It provides a modern, asynchronous API using C++20 coroutines, handling the complexities of connection management and Home Assistant's MQTT Discovery protocol.
+hacpp is a resilient, thread-safe C++ library built on top of `async_mqtt` and `Boost.Asio` designed to manage Home Assistant entities via MQTT. It provides a modern, asynchronous API using C++23 coroutines, handling the complexities of connection management and Home Assistant's MQTT Discovery protocol.
 
 The library is in early stage of development so basiscally everyting can be changed soon.
 
@@ -17,12 +17,12 @@ The library is in early stage of development so basiscally everyting can be chan
     - **Sensor:** For reporting numerical or string values.
     - **Button:** For receiving "press" commands from Home Assistant.
     - **Cover:** For controlling blinds, doors, or shutters.
-- **Modern C++:** Designed for C++20, utilizing coroutines (`boost::asio::awaitable`) for clean asynchronous code.
+- **Modern C++:** Designed for C++23, utilizing coroutines (`boost::asio::awaitable`) for clean asynchronous code.
 - **MQTT v5:** Full support for MQTT v5 features via `async_mqtt`.
 
 ## Requirements
 
-- **C++20 compatible compiler:** GCC 13+, Clang 18+
+- **C++20 compatible compiler:** GCC 14+, Clang 19+
 - **CMake:** 3.27+
 - **Conan:** 2.x
 - **Boost:** 1.90.0+
@@ -75,12 +75,12 @@ Tests are managed with Catch2. Integration tests run within a Docker environment
 
 We use `clang-format` and `clang-tidy` to maintain code quality. Helper scripts are provided in the `tools/` directory:
 
-- **Formatting:** `python3 tools/run-clang-format.py -r lib tests`
-- **Linting:** `python3 tools/run-clang-tidy.py -p build`
+- **Formatting:** `./tools/check-clang-format.sh`
+- **Linting:** `cd build && ../tools/check-clang-tidy.sh`
 
 ### Dev Containers
 
-The project includes configurations for Visual Studio Code Dev Containers, providing a consistent development environment with all necessary tools (GCC 13, Clang 18/19, Conan, etc.) pre-installed.
+The project includes configurations for Visual Studio Code Dev Containers, providing a consistent development environment with all necessary tools (GCC 14, Clang 19, Conan, etc.) pre-installed.
 
 ## License
 
