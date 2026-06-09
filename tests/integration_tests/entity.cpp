@@ -4,12 +4,12 @@
 #include <hacpp/entity.h>
 #include <hacpp/error.h>
 
+#include <boost/asio/any_io_executor.hpp>
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/impl/co_spawn.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/strand.hpp>
-#include <boost/asio/this_coro.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <spdlog/spdlog.h>
@@ -72,7 +72,7 @@ class TestEntity : protected Entity<TestEntity>
       co_return ErrorCode::Success;
     }
 
-    boost::asio::awaitable<Error> async_update_availability_impl(bool /* state */)
+    static boost::asio::awaitable<Error> async_update_availability_impl(bool /* state */)
     {
       co_return ErrorCode::Success;
     }
@@ -98,13 +98,16 @@ void run_proxy(const std::string& cmd)
   }
 }
 
-boost::asio::awaitable<void>
-wait_for_setup_replay(std::shared_ptr<SetupCounters> counters, int initial_discovery_calls, int initial_subscribe_calls)
+boost::asio::awaitable<void> wait_for_setup_replay(
+    boost::asio::any_io_executor exe,
+    std::shared_ptr<SetupCounters> counters,
+    int initial_discovery_calls,
+    int initial_subscribe_calls)
 {
   static constexpr auto default_delay = std::chrono::milliseconds{100};
   static constexpr auto max_attempts = 30;
 
-  auto timer = boost::asio::steady_timer{co_await boost::asio::this_coro::executor};
+  auto timer = boost::asio::steady_timer{exe};
   for (auto attempt = 0; attempt < max_attempts; ++attempt) {
     if (counters->discovery_calls == initial_discovery_calls + 1 &&
         counters->subscribe_calls == initial_subscribe_calls + 1) {
@@ -114,6 +117,8 @@ wait_for_setup_replay(std::shared_ptr<SetupCounters> counters, int initial_disco
     timer.expires_after(default_delay);
     co_await timer.async_wait(boost::asio::use_awaitable);
   }
+
+  co_return;
 }
 
 } // namespace
@@ -156,6 +161,7 @@ TEST_CASE("Entity calls setup again after client reconnect", "[entity][autorecon
               if (!packet && packet.error() != ErrorCode::Disconnected) {
                 REQUIRE(!packet.error());
               }
+              co_return;
             },
             rethrow);
 
@@ -170,8 +176,9 @@ TEST_CASE("Entity calls setup again after client reconnect", "[entity][autorecon
 
         run_proxy("reconnect");
 
-        co_await wait_for_setup_replay(counters, initial_discovery_calls, initial_subscribe_calls);
+        co_await wait_for_setup_replay(strand, counters, initial_discovery_calls, initial_subscribe_calls);
         co_await entity->async_close();
+        co_return;
       },
       rethrow);
   // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
