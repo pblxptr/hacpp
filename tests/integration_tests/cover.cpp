@@ -25,6 +25,7 @@ namespace {
 
 using hacpp::mqtt::ClientType;
 using hacpp::mqtt::Cover;
+using hacpp::mqtt::CoverCfg;
 using hacpp::mqtt::default_component_availability_topic;
 using hacpp::mqtt::default_component_command_topic;
 using hacpp::mqtt::default_component_discovery_topic;
@@ -52,10 +53,10 @@ boost::asio::awaitable<std::shared_ptr<ClientType>> get_verifier(boost::asio::an
   REQUIRE(!err);
 
   auto sub_topics = std::vector<TopicSubopts>{
-      {default_component_discovery_topic(Cover::Defs::Component,    UniqueId), QoS::at_most_once},
-      {default_component_command_topic(Cover::Defs::Component,      UniqueId), QoS::at_most_once},
-      {default_component_state_topic(Cover::Defs::Component,        UniqueId), QoS::at_most_once},
-      {default_component_availability_topic(Cover::Defs::Component, UniqueId), QoS::at_most_once}
+      {default_component_discovery_topic(CoverCfg::Defs::Component,    UniqueId), QoS::at_most_once},
+      {default_component_command_topic(CoverCfg::Defs::Component,      UniqueId), QoS::at_most_once},
+      {default_component_state_topic(CoverCfg::Defs::Component,        UniqueId), QoS::at_most_once},
+      {default_component_availability_topic(CoverCfg::Defs::Component, UniqueId), QoS::at_most_once}
   };
 
   err = co_await client->async_subscribe(sub_topics);
@@ -99,10 +100,10 @@ TEST_CASE("Cover provides all required options during discovery", "[cover]")
 
         // Assert
         REQUIRE(!err);
-        REQUIRE(packet.topic() == default_component_discovery_topic(Cover::Defs::Component, UniqueId));
+        REQUIRE(packet.topic() == default_component_discovery_topic(CoverCfg::Defs::Component, UniqueId));
         auto pobj = boost::json::parse(packet.payload());
-        REQUIRE(pobj.as_object().contains(Cover::Opt::CommandTopic.key));
-        REQUIRE(!pobj.as_object()[Cover::Opt::CommandTopic.key].as_string().empty());
+        REQUIRE(pobj.as_object().contains(CoverCfg::Opt::CommandTopic.key));
+        REQUIRE(!pobj.as_object()[CoverCfg::Opt::CommandTopic.key].as_string().empty());
 
         co_await cover.async_close();
         co_await verifier_client->async_close();
@@ -157,8 +158,8 @@ TEST_CASE("Cover can receive commands", "[cover]")
         SECTION("OPEN command")
         {
           auto err_pub = co_await verifier_client->async_publish(
-              default_component_command_topic(Cover::Defs::Component, UniqueId),
-              Cover::Defs::PayloadOpen);
+              default_component_command_topic(CoverCfg::Defs::Component, UniqueId),
+              CoverCfg::Defs::PayloadOpen);
           REQUIRE(!err_pub);
 
           auto timer = boost::asio::steady_timer{strand};
@@ -170,8 +171,8 @@ TEST_CASE("Cover can receive commands", "[cover]")
         SECTION("CLOSE command")
         {
           auto err_pub = co_await verifier_client->async_publish(
-              default_component_command_topic(Cover::Defs::Component, UniqueId),
-              Cover::Defs::PayloadClose);
+              default_component_command_topic(CoverCfg::Defs::Component, UniqueId),
+              CoverCfg::Defs::PayloadClose);
           REQUIRE(!err_pub);
 
           auto timer = boost::asio::steady_timer{strand};
@@ -183,8 +184,8 @@ TEST_CASE("Cover can receive commands", "[cover]")
         SECTION("STOP command")
         {
           auto err_pub = co_await verifier_client->async_publish(
-              default_component_command_topic(Cover::Defs::Component, UniqueId),
-              Cover::Defs::PayloadStop);
+              default_component_command_topic(CoverCfg::Defs::Component, UniqueId),
+              CoverCfg::Defs::PayloadStop);
           REQUIRE(!err_pub);
 
           auto timer = boost::asio::steady_timer{strand};
@@ -217,9 +218,9 @@ TEST_CASE("Cover state update", "[cover]")
         auto verifier_client = co_await get_verifier(strand);
         // clang-format off
         auto cover = Factory<Cover>(UniqueId, std::move(entity_client))
-                         .set(Cover::Opt::StateTopic,
+                         .set(CoverCfg::Opt::StateTopic,
                               default_component_state_topic(
-                                  Cover::Defs::Component, UniqueId))
+                                  CoverCfg::Defs::Component, UniqueId))
                          .create();
         // clang-format on
         auto err_disc = co_await cover.async_discovery();
@@ -227,13 +228,13 @@ TEST_CASE("Cover state update", "[cover]")
         auto packet_disc = co_await async_recv_packet<PublishPacket>(verifier_client);
 
         // Act
-        auto err = co_await cover.async_update_state(Cover::Defs::StateOpen);
+        auto err = co_await cover.async_update_state(CoverCfg::Defs::StateOpen);
         auto packet = co_await async_recv_packet<PublishPacket>(verifier_client);
 
         // Assert
         REQUIRE(!err);
-        REQUIRE(packet.topic() == default_component_state_topic(Cover::Defs::Component, UniqueId));
-        REQUIRE(packet.payload() == Cover::Defs::StateOpen);
+        REQUIRE(packet.topic() == default_component_state_topic(CoverCfg::Defs::Component, UniqueId));
+        REQUIRE(packet.payload() == CoverCfg::Defs::StateOpen);
 
         co_await cover.async_close();
         co_await verifier_client->async_close();

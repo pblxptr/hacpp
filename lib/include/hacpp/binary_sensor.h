@@ -12,19 +12,8 @@
 
 namespace hacpp::mqtt {
 
-class BinarySensor : protected Entity<BinarySensor>
+struct BinarySensorCfg
 {
-    using Base = Entity<BinarySensor>;
-    friend Base; // TODO(pbiel): Do I need this? Perhaps friend in base is enough
-
-  public:
-    using Base::async_close;
-    using Base::async_discovery;
-    using Base::async_setup;
-    using Base::async_subscribe;
-    using Base::async_update_availability;
-    using Base::executor;
-
     struct Opt
     {
         static constexpr Property PayloadOn{"payload_on"};
@@ -47,8 +36,25 @@ class BinarySensor : protected Entity<BinarySensor>
         QoS qos;
         EntityCfg cfg;
     };
+};
 
-    BinarySensor(Config config, ClientType client)
+template <typename Client = ClientType>
+class BinarySensor : protected Entity<BinarySensor<Client>, Client>
+{
+    using Base = Entity<BinarySensor<Client>, Client>;
+    using Base::async_publish;
+    using Base::async_recv;
+    friend Base; // TODO(pbiel): Do I need this? Perhaps friend in base is enough
+
+  public:
+    using Base::async_close;
+    using Base::async_discovery;
+    using Base::async_setup;
+    using Base::async_subscribe;
+    using Base::async_update_availability;
+    using Base::executor;
+
+    BinarySensor(BinarySensorCfg::Config config, Client client)
         : Base{std::move(client)}
         , config_(std::move(config))
     {}
@@ -61,8 +67,8 @@ class BinarySensor : protected Entity<BinarySensor>
     boost::asio::awaitable<Error> async_update_state(bool state)
     {
       co_return co_await async_publish(
-          config_.cfg[Opt::StateTopic],
-          state ? config_.cfg[Opt::PayloadOn] : config_.cfg[Opt::PayloadOff],
+          config_.cfg[BinarySensorCfg::Opt::StateTopic],
+          state ? config_.cfg[BinarySensorCfg::Opt::PayloadOn] : config_.cfg[BinarySensorCfg::Opt::PayloadOff],
           config_.qos);
     }
 
@@ -84,7 +90,7 @@ class BinarySensor : protected Entity<BinarySensor>
       auto json = config_.cfg.json();
 
       co_return co_await async_publish(
-          default_component_discovery_topic(Defs::Component, config_.unique_id),
+          default_component_discovery_topic(BinarySensorCfg::Defs::Component, config_.unique_id),
           json,
           config_.qos);
     }
@@ -95,14 +101,14 @@ class BinarySensor : protected Entity<BinarySensor>
     }
 
   private:
-    Config config_;
+    BinarySensorCfg::Config config_;
 };
 
-template <>
-class Factory<BinarySensor>
+template <typename Client>
+class Factory<BinarySensor, Client>
 {
   public:
-    Factory(std::string unique_id, ClientType client)
+    Factory(std::string unique_id, Client client)
         : unique_id_(std::move(unique_id))
         , client_(std::move(client))
     {}
@@ -116,20 +122,26 @@ class Factory<BinarySensor>
 
     auto create()
     {
-      return BinarySensor{
-          BinarySensor::Config{.unique_id = unique_id_, .qos = qos_, .cfg = cfg_},
+      // clang-format off
+      return BinarySensor<Client>{
+          BinarySensorCfg::Config{
+            .unique_id = unique_id_,
+            .qos = qos_,
+            .cfg = cfg_
+          },
           std::move(client_)
+        // clang-format on
       };
     }
 
   private:
     std::string unique_id_;
     EntityCfg cfg_{
-        {BinarySensor::Opt::PayloadOn, BinarySensor::Defs::PayloadOn},
-        {BinarySensor::Opt::PayloadOff, BinarySensor::Defs::PayloadOff},
-        {BinarySensor::Opt::StateTopic, default_component_state_topic(BinarySensor::Defs::Component, unique_id_)}
+        {BinarySensorCfg::Opt::PayloadOn, BinarySensorCfg::Defs::PayloadOn},
+        {BinarySensorCfg::Opt::PayloadOff, BinarySensorCfg::Defs::PayloadOff},
+        {BinarySensorCfg::Opt::StateTopic, default_component_state_topic(BinarySensorCfg::Defs::Component, unique_id_)}
     };
     QoS qos_ = QoS::at_most_once;
-    ClientType client_;
+    Client client_;
 };
 } // namespace hacpp::mqtt

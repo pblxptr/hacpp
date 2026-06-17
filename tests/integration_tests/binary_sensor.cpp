@@ -21,6 +21,7 @@ namespace {
 
 using hacpp::mqtt::Availability;
 using hacpp::mqtt::BinarySensor;
+using hacpp::mqtt::BinarySensorCfg;
 using hacpp::mqtt::ClientType;
 using hacpp::mqtt::default_component_availability_topic;
 using hacpp::mqtt::default_component_discovery_topic;
@@ -48,9 +49,9 @@ boost::asio::awaitable<std::shared_ptr<ClientType>> get_verifier(boost::asio::an
   REQUIRE(!err);
 
   auto sub_topics = std::vector<TopicSubopts>{
-      {default_component_discovery_topic(BinarySensor::Defs::Component,    UniqueId), QoS::at_most_once},
-      {default_component_state_topic(BinarySensor::Defs::Component,        UniqueId), QoS::at_most_once},
-      {default_component_availability_topic(BinarySensor::Defs::Component, UniqueId), QoS::at_most_once}
+      {default_component_discovery_topic(BinarySensorCfg::Defs::Component,    UniqueId), QoS::at_most_once},
+      {default_component_state_topic(BinarySensorCfg::Defs::Component,        UniqueId), QoS::at_most_once},
+      {default_component_availability_topic(BinarySensorCfg::Defs::Component, UniqueId), QoS::at_most_once}
   };
 
   err = co_await client->async_subscribe(sub_topics);
@@ -96,10 +97,10 @@ TEST_CASE("Binary sensor provides all required options during discovery", "[bina
 
         // Assert
         REQUIRE(!err);
-        REQUIRE(packet.topic() == default_component_discovery_topic(BinarySensor::Defs::Component, UniqueId));
+        REQUIRE(packet.topic() == default_component_discovery_topic(BinarySensorCfg::Defs::Component, UniqueId));
         auto pobj = boost::json::parse(packet.payload());
-        REQUIRE(pobj.as_object().contains(BinarySensor::Opt::StateTopic.key));
-        REQUIRE(!pobj.as_object()[BinarySensor::Opt::StateTopic.key].as_string().empty());
+        REQUIRE(pobj.as_object().contains(BinarySensorCfg::Opt::StateTopic.key));
+        REQUIRE(!pobj.as_object()[BinarySensorCfg::Opt::StateTopic.key].as_string().empty());
 
         co_await binary_sensor.async_close();
         co_await verifier_client->async_close();
@@ -127,7 +128,7 @@ TEST_CASE("Binary sensor can update its state", "[binary_sensor]")
         auto binary_sensor = Factory<BinarySensor>(UniqueId, std::move(entity_client))
                 .set(Availability::Opt::Topic,
                      default_component_availability_topic(
-                         BinarySensor::Defs::Component, UniqueId))
+                         BinarySensorCfg::Defs::Component, UniqueId))
                 .create();
         // clang-format on
         auto err1 = co_await binary_sensor.async_discovery();
@@ -142,8 +143,8 @@ TEST_CASE("Binary sensor can update its state", "[binary_sensor]")
 
           // Assert
           REQUIRE(!err);
-          REQUIRE(packet.topic() == binary_sensor.config().at(BinarySensor::Opt::StateTopic));
-          REQUIRE(packet.payload() == BinarySensor::Defs::PayloadOn);
+          REQUIRE(packet.topic() == binary_sensor.config().at(BinarySensorCfg::Opt::StateTopic));
+          REQUIRE(packet.payload() == BinarySensorCfg::Defs::PayloadOn);
           co_await binary_sensor.async_close();
           co_await verifier_client->async_close();
         }
@@ -156,8 +157,8 @@ TEST_CASE("Binary sensor can update its state", "[binary_sensor]")
 
           // Assert
           REQUIRE(!err);
-          REQUIRE(packet.topic() == binary_sensor.config().at(BinarySensor::Opt::StateTopic));
-          REQUIRE(packet.payload() == BinarySensor::Defs::PayloadOff);
+          REQUIRE(packet.topic() == binary_sensor.config().at(BinarySensorCfg::Opt::StateTopic));
+          REQUIRE(packet.payload() == BinarySensorCfg::Defs::PayloadOff);
           co_await binary_sensor.async_close();
           co_await verifier_client->async_close();
         }
@@ -185,7 +186,7 @@ TEST_CASE("Binary sensor can update its availability", "[binary_sensor]")
         auto binary_sensor = Factory<BinarySensor>(UniqueId, std::move(entity_client))
                 .set(Availability::Opt::Topic,
                      default_component_availability_topic(
-                         BinarySensor::Defs::Component, UniqueId))
+                         BinarySensorCfg::Defs::Component, UniqueId))
                 .create();
         // clang-format on
         auto err_disc = co_await binary_sensor.async_discovery();
@@ -200,7 +201,7 @@ TEST_CASE("Binary sensor can update its availability", "[binary_sensor]")
 
           // Assert
           REQUIRE(!err);
-          REQUIRE(packet.topic() == default_component_availability_topic(BinarySensor::Defs::Component, UniqueId));
+          REQUIRE(packet.topic() == default_component_availability_topic(BinarySensorCfg::Defs::Component, UniqueId));
           REQUIRE(packet.payload() == Availability::Defs::PayloadAvailable);
         }
 
@@ -212,7 +213,7 @@ TEST_CASE("Binary sensor can update its availability", "[binary_sensor]")
 
           // Assert
           REQUIRE(!err);
-          REQUIRE(packet.topic() == default_component_availability_topic(BinarySensor::Defs::Component, UniqueId));
+          REQUIRE(packet.topic() == default_component_availability_topic(BinarySensorCfg::Defs::Component, UniqueId));
           REQUIRE(packet.payload() == Availability::Defs::PayloadNotAvailable);
         }
 

@@ -156,10 +156,10 @@ class EntityCfg
     boost::json::object obj_;
 };
 
-template <typename Impl>
+template <typename Impl, typename Client>
 class Entity
 {
-    explicit Entity(ClientType client)
+    explicit Entity(Client client)
         : client_{std::move(client)}
     {}
     friend Impl;
@@ -215,9 +215,9 @@ class Entity
     }
 
     template <typename... Args>
-    boost::asio::awaitable<Error> async_publish(Args... args)
+    boost::asio::awaitable<Error> async_publish(Args&&... args)
     {
-      co_return co_await client_.async_publish(std::move(args)...);
+      co_return co_await client_.async_publish(std::forward<Args>(args)...);
     }
 
     boost::asio::awaitable<Error> async_subscribe(std::vector<TopicSubopts> sub_entry)
@@ -261,7 +261,7 @@ class Entity
     }
 
   private:
-    ClientType client_;
+    Client client_;
 };
 
 } // namespace hacpp::mqtt

@@ -7,6 +7,7 @@ add_executable(hacpp-integration-tests
   sensor.cpp
   button.cpp
   cover.cpp
+  shared_client_tests.cpp
 )
 
 find_package(Boost REQUIRED COMPONENTS log filesystem)
@@ -14,7 +15,7 @@ find_package(Catch2 REQUIRED)
 find_package(spdlog REQUIRED)
 
 target_include_directories(hacpp-integration-tests PRIVATE .)
-target_compile_definitions(hacpp-integration-tests PRIVATE 
+target_compile_definitions(hacpp-integration-tests PRIVATE
     INTEGRATION_TEST_ENV_DIR="${CMAKE_CURRENT_SOURCE_DIR}/env"
 )
 

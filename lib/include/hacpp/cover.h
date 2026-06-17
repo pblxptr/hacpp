@@ -15,18 +15,8 @@
 
 namespace hacpp::mqtt {
 
-class Cover : protected Entity<Cover>
+struct CoverCfg
 {
-    using Base = Entity<Cover>;
-    friend Base;
-
-  public:
-    using Base::async_close;
-    using Base::async_discovery;
-    using Base::async_setup;
-    using Base::async_subscribe;
-    using Base::async_update_availability;
-    using Base::executor;
     using Handler = std::function<boost::asio::awaitable<void>()>;
 
     struct Opt
@@ -64,8 +54,24 @@ class Cover : protected Entity<Cover>
         Handler on_close;
         Handler on_stop;
     };
+};
 
-    Cover(Config config, ClientType client)
+template <typename Client = ClientType>
+class Cover : protected Entity<Cover<Client>, Client>
+{
+    using Base = Entity<Cover<Client>, Client>;
+    using Base::async_publish;
+    using Base::async_recv;
+    friend Base;
+
+  public:
+    using Base::async_close;
+    using Base::async_discovery;
+    using Base::async_setup;
+    using Base::async_subscribe;
+    using Base::async_update_availability;
+    using Base::executor;
+    Cover(CoverCfg::Config config, Client client)
         : Base{std::move(client)}
         , config_(std::move(config))
     {}
@@ -77,11 +83,11 @@ class Cover : protected Entity<Cover>
 
     boost::asio::awaitable<Error> async_update_state(std::string state)
     {
-      if (!config_.cfg.contains(Opt::StateTopic)) {
+      if (!config_.cfg.contains(CoverCfg::Opt::StateTopic)) {
         co_return ErrorCode::InvalidConfig;
       }
 
-      co_return co_await async_publish(config_.cfg[Opt::StateTopic], state, config_.qos);
+      co_return co_await async_publish(config_.cfg[CoverCfg::Opt::StateTopic], state, config_.qos);
     }
 
   public:
@@ -96,7 +102,7 @@ class Cover : protected Entity<Cover>
         res->visit([&](auto&& packet) {
           using PacketType = std::decay_t<decltype(packet)>;
           if constexpr (std::is_same_v<PacketType, async_mqtt::v5::publish_packet>) {
-            if (packet.topic() == config_.cfg[Opt::CommandTopic]) {
+            if (packet.topic() == config_.cfg[CoverCfg::Opt::CommandTopic]) {
               auto payload = packet.payload();
               auto cmd = std::string_view{payload.data(), payload.size()};
               dispatch(cmd);
@@ -111,15 +117,15 @@ class Cover : protected Entity<Cover>
   protected:
     void dispatch(std::string_view cmd)
     {
-      if (cmd == config_.cfg[Opt::PayloadOpen]) {
+      if (cmd == config_.cfg[CoverCfg::Opt::PayloadOpen]) {
         if (config_.on_open) {
           boost::asio::co_spawn(executor(), config_.on_open(), boost::asio::detached);
         }
-      } else if (cmd == config_.cfg[Opt::PayloadClose]) {
+      } else if (cmd == config_.cfg[CoverCfg::Opt::PayloadClose]) {
         if (config_.on_close) {
           boost::asio::co_spawn(executor(), config_.on_close(), boost::asio::detached);
         }
-      } else if (cmd == config_.cfg[Opt::PayloadStop]) {
+      } else if (cmd == config_.cfg[CoverCfg::Opt::PayloadStop]) {
         if (config_.on_stop) {
           boost::asio::co_spawn(executor(), config_.on_stop(), boost::asio::detached);
         }
@@ -131,7 +137,7 @@ class Cover : protected Entity<Cover>
       auto json = config_.cfg.json();
 
       co_return co_await async_publish(
-          default_component_discovery_topic(Defs::Component, config_.unique_id),
+          default_component_discovery_topic(CoverCfg::Defs::Component, config_.unique_id),
           json,
           config_.qos);
     }
@@ -139,21 +145,21 @@ class Cover : protected Entity<Cover>
     boost::asio::awaitable<Error> async_subscribe_impl()
     {
       auto sub_topics = std::vector<TopicSubopts>{
-          {config_.cfg[Opt::CommandTopic], config_.qos}
+          {config_.cfg[CoverCfg::Opt::CommandTopic], config_.qos}
       };
 
       co_return co_await async_subscribe(sub_topics);
     }
 
   private:
-    Config config_;
+    CoverCfg::Config config_;
 };
 
-template <>
-class Factory<Cover>
+template <typename Client>
+class Factory<Cover, Client>
 {
   public:
-    Factory(std::string unique_id, ClientType client)
+    Factory(std::string unique_id, Client client)
         : unique_id_(std::move(unique_id))
         , client_(std::move(client))
     {}
@@ -165,31 +171,31 @@ class Factory<Cover>
       return *this;
     }
 
-    auto& on_open(Cover::Handler handler)
+    auto& on_open(CoverCfg::Handler handler)
     {
       on_open_ = std::move(handler);
-      if (!cfg_.contains(Cover::Opt::PayloadOpen)) {
-        cfg_.set(Cover::Opt::PayloadOpen, Cover::Defs::PayloadOpen);
+      if (!cfg_.contains(CoverCfg::Opt::PayloadOpen)) {
+        cfg_.set(CoverCfg::Opt::PayloadOpen, CoverCfg::Defs::PayloadOpen);
       }
 
       return *this;
     }
 
-    auto& on_close(Cover::Handler handler)
+    auto& on_close(CoverCfg::Handler handler)
     {
       on_close_ = std::move(handler);
-      if (!cfg_.contains(Cover::Opt::PayloadClose)) {
-        cfg_.set(Cover::Opt::PayloadClose, Cover::Defs::PayloadClose);
+      if (!cfg_.contains(CoverCfg::Opt::PayloadClose)) {
+        cfg_.set(CoverCfg::Opt::PayloadClose, CoverCfg::Defs::PayloadClose);
       }
 
       return *this;
     }
 
-    auto& on_stop(Cover::Handler handler)
+    auto& on_stop(CoverCfg::Handler handler)
     {
       on_stop_ = std::move(handler);
-      if (!cfg_.contains(Cover::Opt::PayloadStop)) {
-        cfg_.set(Cover::Opt::PayloadStop, Cover::Defs::PayloadStop);
+      if (!cfg_.contains(CoverCfg::Opt::PayloadStop)) {
+        cfg_.set(CoverCfg::Opt::PayloadStop, CoverCfg::Defs::PayloadStop);
       }
 
       return *this;
@@ -197,30 +203,33 @@ class Factory<Cover>
 
     auto create()
     {
-      return Cover{
-          Cover::Config{
-                        .unique_id = unique_id_,
-                        .qos = qos_,
-                        .cfg = cfg_,
-                        .on_open = std::move(on_open_),
-                        .on_close = std::move(on_close_),
-                        .on_stop = std::move(on_stop_)},
+      // clang-format off
+      return Cover<Client>{
+          CoverCfg::Config{
+            .unique_id = unique_id_,
+            .qos = qos_,
+            .cfg = cfg_,
+            .on_open = std::move(on_open_),
+            .on_close = std::move(on_close_),
+            .on_stop = std::move(on_stop_)
+          },
           std::move(client_)
       };
+      // clang-format on
     }
 
   private:
     std::string unique_id_;
     EntityCfg cfg_{
-        {Cover::Opt::CommandTopic, default_component_command_topic(Cover::Defs::Component, unique_id_)},
-        // { Cover::Opt::StateTopic,
-        // default_component_state_topic(Cover::Defs::Component, unique_id_) }
+        {CoverCfg::Opt::CommandTopic, default_component_command_topic(CoverCfg::Defs::Component, unique_id_)},
+        // { CoverCfg::Opt::StateTopic,
+        // default_component_state_topic(CoverCfg::Defs::Component, unique_id_) }
     };
     QoS qos_ = QoS::at_least_once;
-    ClientType client_;
-    Cover::Handler on_open_;
-    Cover::Handler on_close_;
-    Cover::Handler on_stop_;
+    Client client_;
+    CoverCfg::Handler on_open_;
+    CoverCfg::Handler on_close_;
+    CoverCfg::Handler on_stop_;
 };
 
 } // namespace hacpp::mqtt

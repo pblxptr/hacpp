@@ -38,9 +38,9 @@ struct SetupCounters
     int subscribe_calls{0};
 };
 
-class TestEntity : protected Entity<TestEntity>
+class TestEntity : protected Entity<TestEntity, ClientType>
 {
-    using Base = Entity<TestEntity>;
+    using Base = Entity<TestEntity, ClientType>;
     friend Base;
 
   public:
