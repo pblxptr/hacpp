@@ -1,293 +1,56 @@
-#include <hacpp/async_mqtt_client.h>
+#include <hacpp/shared_mqtt_client.h>
+
 #include <catch2/catch_test_macros.hpp>
+#include <fmt/format.h>
 
-namespace hacpp::mqtt {
-
-class SharedAsyncMqttClient;
-
-class RecvResultQueue
-{
-public:
-    RecvResultQueue(boost::asio::any_io_executor executor)
-        : timer_{executor}
-    {
-        timer_.expires_at(boost::asio::steady_timer::time_point::max());
-    }
-
-    boost::asio::awaitable<void> push_back(RecvResult result)
-    {
-        spdlog::debug("RecvResultQueue::{}:", __func__);
-
-        queue_.push_back(std::move(result));
-
-        timer_.cancel();
-        co_return;
-    }
-
-    boost::asio::awaitable<RecvResult> pop_front()
-    {
-        spdlog::debug("RecvResultQueue::{}:", __func__);
-
-        if (queue_.empty()) {
-            spdlog::debug("RecvResultQueue::{}: waiting...", __func__);
-            boost::system::error_code ec;
-            co_await timer_.async_wait(boost::asio::redirect_error(boost::asio::use_awaitable, ec));
-            spdlog::debug("RecvResultQueue::{}: waiting done", __func__);
-        }
-
-        // TODO: Check if queue has an element
-
-        auto result = std::move(queue_.front());
-        queue_.pop_front();
-        co_return result;
-    }
-
-private:
-    std::deque<RecvResult> queue_;
-    boost::asio::steady_timer timer_;
-};
-
-class ProxyState
-{
-public:
-    ProxyState(boost::asio::any_io_executor executor)
-        : queue_(executor)
-    {}
-
-    RecvResultQueue& queue()
-    {
-        return queue_;
-    }
-
-    std::vector<TopicSubopts>& topics()
-    {
-        return topics_;
-    }
-
-private:
-    RecvResultQueue queue_;
-    std::vector<TopicSubopts> topics_;
-};
-
-class SharedClientProxy
-{
-public:
-    explicit SharedClientProxy(std::shared_ptr<SharedAsyncMqttClient> shared_client);
-    auto executor();
-    boost::asio::awaitable<Error> async_close();
-    template <typename... Args>
-    boost::asio::awaitable<Error> async_publish(Args... args);
-    template <typename... Args>
-    boost::asio::awaitable<Error> async_subscribe(Args... args);
-    boost::asio::awaitable<RecvResult> async_recv();
-private:
-    std::shared_ptr<SharedAsyncMqttClient> shared_client_;
-    std::shared_ptr<ProxyState> state_;
-};
-
-class SharedAsyncMqttClient : public std::enable_shared_from_this<SharedAsyncMqttClient>
-{
-private:
-    SharedAsyncMqttClient(AsyncMqttClient2 client)
-        : client_(std::move(client))
-    {}
-
-public:
-    static std::shared_ptr<SharedAsyncMqttClient> create(AsyncMqttClient2 client)
-    {
-        return std::shared_ptr<SharedAsyncMqttClient>(new SharedAsyncMqttClient(std::move(client)));
-    }
-
-    auto executor()
-    {
-        return client_.executor();
-    }
-
-    auto proxy()
-    {
-        return SharedClientProxy{shared_from_this()};
-    }
-
-    boost::asio::awaitable<Error> async_connect()
-    {
-        return client_.async_connect();
-    }
-
-    boost::asio::awaitable<Error> async_close(std::shared_ptr<ProxyState> state)
-    {
-        // Remove the proxy state from the list of proxies
-        proxies_.erase(std::remove_if(proxies_.begin(), proxies_.end(),
-            [&state](const std::weak_ptr<ProxyState>& weak_proxy) {
-                return weak_proxy.lock() == state;
-            }), proxies_.end());
-
-        co_return Error{};
-    }
-
-    template <typename... Args>
-    boost::asio::awaitable<Error> async_publish(Args... args)
-    {
-      co_return co_await client_.async_publish(std::move(args)...);
-    }
-
-    boost::asio::awaitable<Error> async_subscribe(std::shared_ptr<ProxyState> state, std::vector<TopicSubopts> topics)
-    {
-        auto err = co_await client_.async_subscribe(topics);
-        if (err) {
-            co_return err;
-        };
-
-        for (const auto& topic : topics) {
-            state->topics().push_back(topic);
-        }
-
-        proxies_.push_back(state);
-
-        spdlog::debug("SharedAsyncMqttClient::{}: proxies count: {}", __func__, proxies_.size());
-
-        co_return err;
-    }
-
-    boost::asio::awaitable<void> async_recv()
-    {
-        auto result = co_await client_.async_recv();
-
-        if (!result) {
-            for (const auto& weak_proxy : proxies_) {
-                if (auto proxy = weak_proxy.lock()) {
-                    co_await proxy->queue().push_back(result);
-                }
-            }
-        }
-
-        const auto& packet = result->get<PublishPacket>();
-
-        spdlog::debug("SharedAsyncMqttClient::{}: proxies count: {}", __func__, proxies_.size());
-
-        // TODO: This is a naive implementation that iterates through all proxies and their topics for every received packet.
-        for (const auto& weak_proxy : proxies_) {
-            if (auto proxy = weak_proxy.lock()) {
-                spdlog::debug("Proxy is alive");
-                for (const auto& topic : proxy->topics()) {
-                    spdlog::debug("Pushing to proxy...");
-                    if (topic.topic() == packet.topic()) {
-                        co_await proxy->queue().push_back(result);
-                    }
-                }
-            }
-        }
-    }
-
-private:
-    AsyncMqttClient2 client_;
-    std::vector<std::weak_ptr<ProxyState>> proxies_;
-};
-
-
-SharedClientProxy::SharedClientProxy(std::shared_ptr<SharedAsyncMqttClient> shared_client)
-    : shared_client_(std::move(shared_client))
-    , state_{std::make_shared<ProxyState>(shared_client_->executor())}
-{}
-
-auto SharedClientProxy::executor()
-{
-    return shared_client_->executor();
-}
-
-boost::asio::awaitable<Error> SharedClientProxy::async_close()
-{
-    co_return co_await shared_client_->async_close(state_);
-}
-
-template <typename... Args>
-boost::asio::awaitable<Error> SharedClientProxy::async_publish(Args... args)
-{
-    co_return co_await shared_client_->async_publish(std::move(args)...);
-}
-
-template <typename... Args>
-boost::asio::awaitable<Error> SharedClientProxy::async_subscribe(Args... args)
-{
-    co_return co_await shared_client_->async_subscribe(state_, std::move(args)...);
-}
-
-boost::asio::awaitable<RecvResult> SharedClientProxy::async_recv()
-{
-    co_return co_await state_->queue().pop_front();
-}
-
-}
-
-/*
-
-Entity1 ---- Proxy -
-                   |
-                   |
-Entity2 ---- Proxy ------ SharedClient ----- Client
-                   |
-                   |
-Entity3 ---- Proxy -
-
-*/
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <memory>
+#include <numeric>
+#include <random>
+#include <string>
+#include <thread>
+#include <vector>
 
 #include "config.h"
-#include <hacpp/button.h>
-#include <random>
 
-using hacpp::mqtt::SharedClientProxy;
-using hacpp::mqtt::Button;
-using hacpp::mqtt::ButtonCfg;
 using hacpp::mqtt::ClientType;
-using hacpp::mqtt::factory;
-using hacpp::mqtt::default_component_command_topic;
+using hacpp::mqtt::PublishPacket;
+using hacpp::mqtt::QoS;
+using hacpp::mqtt::TopicSubopts;
 
-#include <iostream>
-
-auto button(std::string id, SharedClientProxy proxy)
-{
-    return factory<Button>(id, std::move(proxy))
-        .set(ButtonCfg::Opt::PayloadPress, fmt::format("press-{}", id))
-        .on_press([id = std::move(id)]() -> boost::asio::awaitable<void> {
-            std::cout << "id:" << id << '\n';
-            co_return;
-        })
-        .create();
-}
-
-static constexpr auto NumberOfButtonEntities = 50;
-static constexpr auto NumberOfPublishPerEntity = 100;
-static constexpr auto TotalMsgExchange = NumberOfButtonEntities * NumberOfPublishPerEntity;
+static constexpr auto NumberOfProxies = 50;
+static constexpr auto NumberOfPublishPerProxy = 100;
+static constexpr auto TotalMsgExchange = NumberOfProxies * NumberOfPublishPerProxy;
 static constexpr auto ExchangeTimeout = std::chrono::seconds{180};
 
 static std::atomic<bool> PublishDone = false;
 
-static auto get_payload_press(const std::string& id)
+static auto get_payload_press(int id)
 {
     return fmt::format("press-{}", id);
 }
 
-static auto get_id_str(int id)
+static auto get_command_topic(int id)
 {
-    return fmt::format("btn-{}", id);
+    return fmt::format("hacpp/shared-client-test/{}/command", id);
 }
 
-static auto get_command_topic(const std::string& id)
-{
-    return default_component_command_topic(ButtonCfg::Defs::Component, id);
-}
-
-static auto spawn_publisher_thread()
+static auto spawn_publisher_thread(std::shared_ptr<std::atomic<bool>> ready_to_publish)
 {
     auto io = std::make_shared<boost::asio::io_context>();
     auto strand = boost::asio::make_strand(*io);
 
+    // Fill the list of ids e.g 3 clients each 4 msgs [ 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2 ]
     auto publist = std::vector<int>{};
-    for (auto i = 0; i < NumberOfButtonEntities; i++) {
-        for (auto j = 0; j < NumberOfPublishPerEntity; j++) {
+    for (auto i = 0; i < NumberOfProxies; i++) {
+        for (auto j = 0; j < NumberOfPublishPerProxy; j++) {
             publist.push_back(i);
         }
     }
 
+    // Shuffle the list
     std::shuffle(publist.begin(), publist.end(), std::mt19937{std::random_device{}()});
 
     boost::asio::co_spawn(strand, [io, strand, publist = std::move(publist)](this auto /* self */) -> boost::asio::awaitable<void> {
@@ -296,19 +59,16 @@ static auto spawn_publisher_thread()
         REQUIRE(!err);
 
         for (const auto& id : publist) {
-            const auto id_str = get_id_str(id);
-            const auto topic = get_command_topic(id_str);
-            const auto payload = get_payload_press(id_str);
-
-            auto err = co_await client->async_publish(topic, payload);
+            auto err = co_await client->async_publish(get_command_topic(id), get_payload_press(id));
             REQUIRE(!err);
-            spdlog::debug("topic: {}, payload: {}", topic, payload);
         }
         io->stop();
     }, boost::asio::detached);
 
-    return std::jthread([io]() {
-        std::this_thread::sleep_for(std::chrono::seconds{10});
+    return std::jthread([io, ready_to_publish = std::move(ready_to_publish)]() {
+        while (!ready_to_publish->load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds{10});
+        }
 
         io->run();
         PublishDone = true;
@@ -316,19 +76,19 @@ static auto spawn_publisher_thread()
     });
 }
 
-TEST_CASE("SharedAsyncMqttClient can handle multiple entities", "[integration][shared_async_mqtt_client][robustness]")
+TEST_CASE("SharedAsyncMqttClient can handle multiple proxies", "[integration][shared_async_mqtt_client][robustness]")
 {
     // Arrange
-    static auto Counters = std::unordered_map<std::string, int>{};
-    for (int i = 0; i < NumberOfButtonEntities; ++i) {
-        Counters[get_id_str(i)] = 0;
-    }
+    PublishDone = false;
+    auto counters = std::vector<int>(NumberOfProxies, 0);
+    auto subscribed_count = std::make_shared<std::atomic<int>>(0);
+    auto ready_to_publish = std::make_shared<std::atomic<bool>>(false);
 
     auto io = boost::asio::io_context{};
     auto strand = boost::asio::make_strand(io);
 
     // Act
-    boost::asio::co_spawn(strand, [strand](this auto /* self */) -> boost::asio::awaitable<void> {
+    boost::asio::co_spawn(strand, [strand, &counters, subscribed_count, ready_to_publish](this auto /* self */) -> boost::asio::awaitable<void> {
         auto shared_client = hacpp::mqtt::SharedAsyncMqttClient::create(
             hacpp::mqtt::AsyncMqttClient2{strand, config()});
 
@@ -341,45 +101,57 @@ TEST_CASE("SharedAsyncMqttClient can handle multiple entities", "[integration][s
             }
         }, boost::asio::detached);
 
-        for (int i = 0; i < NumberOfButtonEntities; ++i) {
-            boost::asio::co_spawn(shared_client->executor(), [shared_client, i](this auto /* self */) -> boost::asio::awaitable<void>{
-                auto id = get_id_str(i);
-                auto btn = factory<Button>(get_id_str(i), shared_client->proxy())
-                    .set(ButtonCfg::Opt::PayloadPress, get_payload_press(id))
-                    .set(ButtonCfg::Opt::CommandTopic, get_command_topic(id))
-                    .on_press([id = std::move(id)]() -> boost::asio::awaitable<void> {
-                        Counters[id]++;
+        for (int i = 0; i < NumberOfProxies; ++i) {
+            boost::asio::co_spawn(shared_client->executor(), [shared_client, i, &counters, subscribed_count](this auto /* self */) -> boost::asio::awaitable<void>{
+                auto proxy = shared_client->proxy();
+                auto sub_topics = std::vector<TopicSubopts>{{get_command_topic(i), QoS::at_least_once}};
+                auto err = co_await proxy.async_subscribe(std::move(sub_topics));
+                REQUIRE(!err);
+                ++(*subscribed_count);
+
+                while (true) {
+                    auto result = co_await proxy.async_recv();
+                    if (!result) {
                         co_return;
-                    })
-                    .create();
-                co_await btn.async_setup();
-                co_await btn.async_run();
+                    }
+
+                    const auto& packet = result->template get<PublishPacket>();
+                    if (packet.topic() == get_command_topic(i) && packet.payload() == get_payload_press(i)) {
+                        ++counters[i];
+                    }
+                }
             }, boost::asio::detached);
         }
+
+        auto timer = boost::asio::steady_timer{strand};
+        while (subscribed_count->load() != NumberOfProxies) {
+            timer.expires_after(std::chrono::milliseconds{10});
+            co_await timer.async_wait(boost::asio::use_awaitable);
+        }
+        ready_to_publish->store(true);
+
     }, boost::asio::detached);
 
-    boost::asio::co_spawn(strand, [strand, &io](this auto /* self */) -> boost::asio::awaitable<void> {
+    // Infinity test duration protection guard
+    boost::asio::co_spawn(strand, [strand, &io, &counters](this auto /* self */) -> boost::asio::awaitable<void> {
         auto timer = boost::asio::steady_timer{strand};
-        auto start = boost::asio::steady_timer::clock_type::now();
-        auto end = boost::asio::steady_timer::clock_type::now() + std::chrono::seconds{TotalMsgExchange};
+        auto end = boost::asio::steady_timer::clock_type::now() + ExchangeTimeout;
 
-        auto accumulate = []() {
-            return std::accumulate(Counters.begin(), Counters.end(), 0, [](int acc, auto& elem) {
-                return acc + elem.second;
-            });
+        auto total_received = [&counters]() {
+            return std::accumulate(counters.begin(), counters.end(), 0);
         };
 
         while (true) {
-            if (accumulate() == TotalMsgExchange) {
+            if (total_received() == TotalMsgExchange) {
                 break;
             }
 
             if (boost::asio::steady_timer::clock_type::now() < end) {
-                spdlog::debug("Timeout still valid... waiting");
-                timer.expires_after(std::chrono::seconds{1});
+                spdlog::debug("Timeout still valid... waiting, received: {}", total_received());
+                timer.expires_after(std::chrono::milliseconds{100});
                 co_await timer.async_wait(boost::asio::use_awaitable);
             } else {
-                spdlog::debug("Timer expired...stopping");
+                spdlog::debug("Timer expired...stopping, received: {}", total_received());
                 break;
             }
         }
@@ -387,60 +159,20 @@ TEST_CASE("SharedAsyncMqttClient can handle multiple entities", "[integration][s
         io.stop();
     }, boost::asio::detached);
 
-    auto publisher_th = spawn_publisher_thread();
+    auto publisher_th = spawn_publisher_thread(ready_to_publish);
 
     io.run();
+
+    if (publisher_th.joinable()) {
+        publisher_th.join();
+    }
 
     // Assert
     REQUIRE(PublishDone);
-    int total_msgs = std::accumulate(Counters.begin(), Counters.end(), 0, [](int acc, auto& elem) {
-        return acc + elem.second;
-    });
+    const auto total_msgs = std::accumulate(counters.begin(), counters.end(), 0);
 
     REQUIRE(total_msgs == TotalMsgExchange);
-    for (const auto& [id, count] : Counters) {
-        REQUIRE(count == NumberOfPublishPerEntity);
+    for (const auto& count : counters) {
+        REQUIRE(count == NumberOfPublishPerProxy);
     }
-}
-
-TEST_CASE("SharedAsyncMqttClient can be constructed and destructed", "[integration][shared_async_mqtt_client]")
-{
-    auto io = boost::asio::io_context{};
-    auto strand = boost::asio::make_strand(io);
-
-    boost::asio::co_spawn(strand, [strand](this auto /* self */) -> boost::asio::awaitable<void> {
-
-        auto shared_client = hacpp::mqtt::SharedAsyncMqttClient::create(
-            hacpp::mqtt::AsyncMqttClient2{strand, config()});
-
-        auto err = co_await shared_client->async_connect();
-        REQUIRE(!err);
-
-        boost::asio::co_spawn(shared_client->executor(), [shared_client](this auto /* self */) -> boost::asio::awaitable<void> {
-            while (true) {
-                co_await shared_client->async_recv();
-            }
-        }, boost::asio::detached);
-
-        boost::asio::co_spawn(shared_client->executor(), [shared_client](this auto /* self */) -> boost::asio::awaitable<void>{
-            auto btn1 = button("btn-1", shared_client->proxy());
-            co_await btn1.async_setup();
-            co_await btn1.async_run();
-        }, boost::asio::detached);
-
-        boost::asio::co_spawn(shared_client->executor(), [shared_client](this auto /* self */) -> boost::asio::awaitable<void>{
-            auto btn2 = button("btn-2", shared_client->proxy());
-            co_await btn2.async_setup();
-            co_await btn2.async_run();
-        }, boost::asio::detached);
-
-        boost::asio::co_spawn(shared_client->executor(), [shared_client](this auto /* self */) -> boost::asio::awaitable<void>{
-            auto btn3 = button("btn-3", shared_client->proxy());
-            co_await btn3.async_setup();
-            co_await btn3.async_run();
-        }, boost::asio::detached);
-
-    }, boost::asio::detached);
-
-    io.run();
 }
