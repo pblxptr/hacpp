@@ -101,7 +101,7 @@ class Button : protected Entity<Button<Client>, Client>
             if (packet.topic() == config_.cfg[ButtonCfg::Opt::CommandTopic] &&
                 packet.payload() == config_.cfg[ButtonCfg::Opt::PayloadPress]) {
               if (config_.handler) {
-                boost::asio::co_spawn(executor(), config_.handler(), boost::asio::detached);
+                boost::asio::co_spawn(this->executor(), config_.handler(), boost::asio::detached);
               }
             }
           }

@@ -119,15 +119,15 @@ class Cover : protected Entity<Cover<Client>, Client>
     {
       if (cmd == config_.cfg[CoverCfg::Opt::PayloadOpen]) {
         if (config_.on_open) {
-          boost::asio::co_spawn(executor(), config_.on_open(), boost::asio::detached);
+          boost::asio::co_spawn(this->executor(), config_.on_open(), boost::asio::detached);
         }
       } else if (cmd == config_.cfg[CoverCfg::Opt::PayloadClose]) {
         if (config_.on_close) {
-          boost::asio::co_spawn(executor(), config_.on_close(), boost::asio::detached);
+          boost::asio::co_spawn(this->executor(), config_.on_close(), boost::asio::detached);
         }
       } else if (cmd == config_.cfg[CoverCfg::Opt::PayloadStop]) {
         if (config_.on_stop) {
-          boost::asio::co_spawn(executor(), config_.on_stop(), boost::asio::detached);
+          boost::asio::co_spawn(this->executor(), config_.on_stop(), boost::asio::detached);
         }
       }
     }
