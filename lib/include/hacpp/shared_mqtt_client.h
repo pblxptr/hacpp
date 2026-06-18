@@ -40,14 +40,20 @@ class RecvResultQueue
     {
       spdlog::debug("RecvResultQueue::{}:", __func__);
 
+      boost::system::error_code ec;
+
       if (queue_.empty()) {
-        spdlog::debug("RecvResultQueue::{}: waiting...", __func__);
-        boost::system::error_code ec;
         co_await timer_.async_wait(boost::asio::redirect_error(boost::asio::use_awaitable, ec));
-        spdlog::debug("RecvResultQueue::{}: waiting done", __func__);
       }
 
-      // TODO(pbiel): Check if queue has an element
+      if (queue_.empty()) {
+        if (ec) {
+          co_return std::unexpected(map_err(ec));
+        }
+
+        spdlog::error("Wait timer has been cancelled but queue is still empty and timer finished with no error");
+        co_return std::unexpected(ErrorCode::InternalError);
+      }
 
       auto result = std::move(queue_.front());
       queue_.pop_front();
@@ -167,6 +173,7 @@ class SharedAsyncMqttClient : public std::enable_shared_from_this<SharedAsyncMqt
             co_await proxy->queue().push_back(result);
           }
         }
+        co_return;
       }
 
       const auto& packet = result->get<PublishPacket>();

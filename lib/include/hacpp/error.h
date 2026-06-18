@@ -68,7 +68,7 @@ class ErrorCategory : public boost::system::error_category
         case ErrorCode::InternalError:          return "internal_error";
         case ErrorCode::InvalidPacket:          return "invalid_packet";
         case ErrorCode::UnknownError:           return "unknown_error";
-        default:                                return "TODO(pbie): Handle error";
+        default:                                return "TODO(pbiel): Handle error";
       }
     }
 };
