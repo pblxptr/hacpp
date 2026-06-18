@@ -122,7 +122,7 @@ class Factory<Sensor, Client>
             .cfg = cfg_
           },
           std::move(client_)
-        // clang-format on
+          // clang-format on
       };
     }
 

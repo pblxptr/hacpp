@@ -130,7 +130,7 @@ class Factory<BinarySensor, Client>
             .cfg = cfg_
           },
           std::move(client_)
-        // clang-format on
+          // clang-format on
       };
     }
 
@@ -139,7 +139,8 @@ class Factory<BinarySensor, Client>
     EntityCfg cfg_{
         {BinarySensorCfg::Opt::PayloadOn, BinarySensorCfg::Defs::PayloadOn},
         {BinarySensorCfg::Opt::PayloadOff, BinarySensorCfg::Defs::PayloadOff},
-        {BinarySensorCfg::Opt::StateTopic, default_component_state_topic(BinarySensorCfg::Defs::Component, unique_id_)}
+        {BinarySensorCfg::Opt::StateTopic,
+         default_component_state_topic(BinarySensorCfg::Defs::Component, unique_id_)}
     };
     QoS qos_ = QoS::at_most_once;
     Client client_;
