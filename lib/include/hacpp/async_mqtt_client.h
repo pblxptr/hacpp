@@ -243,7 +243,13 @@ class AsyncMqttClient2
       auto err = Error{};
       co_await conn_.autorec_wait_timer.async_wait(boost::asio::redirect_error(boost::asio::use_awaitable, err));
 
-      spdlog::debug("Reconnect wait finished: {} ({})", err.value(), err.message());
+      if (err == boost::asio::error::operation_aborted) {
+        spdlog::debug("Reconnect wait finished by notification");
+      } else if (err) {
+        spdlog::warn("Reconnect wait failed: {}", err.message());
+      } else {
+        spdlog::warn("Reconnect wait timer expired unexpectedly");
+      }
     }
 
     boost::asio::awaitable<Error> async_handle_reconnect()
@@ -268,9 +274,10 @@ class AsyncMqttClient2
       while (conn_.attempt++ < conn_.max_attempts) {
         spdlog::debug("Reconnecting, attempt: {}/{}", conn_.attempt, conn_.max_attempts);
 
-        delay = std::min(delay * 2, max_delay);
         timer.expires_after(std::chrono::seconds{delay});
         co_await timer.async_wait(boost::asio::use_awaitable);
+
+        delay = std::min(delay * 2, max_delay);
 
         err = co_await async_connect();
         if (!err) {
