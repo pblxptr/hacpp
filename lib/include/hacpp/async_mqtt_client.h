@@ -257,7 +257,8 @@ class AsyncMqttClient2
         co_return ErrorCode::InternalError;
       }
 
-      const auto base_delay = std::chrono::seconds{1};
+      auto delay = std::chrono::seconds{1};
+      const auto max_delay = std::chrono::seconds{30};
       auto timer = boost::asio::steady_timer{executor()};
 
       conn_.state = State::Reconnecting;
@@ -267,7 +268,8 @@ class AsyncMqttClient2
       while (conn_.attempt++ < conn_.max_attempts) {
         spdlog::debug("Reconnecting, attempt: {}/{}", conn_.attempt, conn_.max_attempts);
 
-        timer.expires_after(std::chrono::seconds{base_delay.count() * (1 << (conn_.attempt - 1))});
+        delay = std::min(delay * 2, max_delay);
+        timer.expires_after(std::chrono::seconds{delay});
         co_await timer.async_wait(boost::asio::use_awaitable);
 
         err = co_await async_connect();

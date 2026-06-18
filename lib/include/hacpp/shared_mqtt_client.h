@@ -167,6 +167,7 @@ class SharedAsyncMqttClient : public std::enable_shared_from_this<SharedAsyncMqt
             co_await proxy->queue().push_back(result);
           }
         }
+        co_return;
       }
 
       const auto& packet = result->get<PublishPacket>();
