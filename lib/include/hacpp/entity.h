@@ -2,6 +2,7 @@
 
 #include <hacpp/async_mqtt_client.h>
 
+#include <boost/asio/io_context.hpp>
 #include <boost/json.hpp>
 
 #include <initializer_list>
@@ -215,9 +216,9 @@ class Entity
     }
 
     template <typename... Args>
-    boost::asio::awaitable<Error> async_publish(Args&&... args)
+    boost::asio::awaitable<Error> async_publish(Args... args)
     {
-      co_return co_await client_.async_publish(std::forward<Args>(args)...);
+      co_return co_await client_.async_publish(std::move(args)...);
     }
 
     boost::asio::awaitable<Error> async_subscribe(std::vector<TopicSubopts> sub_entry)

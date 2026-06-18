@@ -2,7 +2,13 @@
 
 #include <hacpp/async_mqtt_client.h>
 
-#include <algorithm>
+#include <boost/asio/any_io_executor.hpp>
+#include <boost/asio/awaitable.hpp>
+#include <boost/asio/redirect_error.hpp>
+#include <boost/asio/steady_timer.hpp>
+#include <boost/asio/use_awaitable.hpp>
+#include <spdlog/spdlog.h>
+
 #include <deque>
 #include <memory>
 #include <utility>
@@ -15,7 +21,7 @@ class SharedAsyncMqttClient;
 class RecvResultQueue
 {
   public:
-    RecvResultQueue(boost::asio::any_io_executor executor)
+    explicit RecvResultQueue(const boost::asio::any_io_executor& executor)
         : timer_{executor}
     {
       timer_.expires_at(boost::asio::steady_timer::time_point::max());
@@ -41,7 +47,7 @@ class RecvResultQueue
         spdlog::debug("RecvResultQueue::{}: waiting done", __func__);
       }
 
-      // TODO: Check if queue has an element
+      // TODO(pbiel): Check if queue has an element
 
       auto result = std::move(queue_.front());
       queue_.pop_front();
@@ -56,7 +62,7 @@ class RecvResultQueue
 class ProxyState
 {
   public:
-    ProxyState(boost::asio::any_io_executor executor)
+    explicit ProxyState(const boost::asio::any_io_executor& executor)
         : queue_(executor)
     {}
 
@@ -94,8 +100,7 @@ class SharedClientProxy
 
 class SharedAsyncMqttClient : public std::enable_shared_from_this<SharedAsyncMqttClient>
 {
-  private:
-    SharedAsyncMqttClient(AsyncMqttClient2 client)
+    explicit SharedAsyncMqttClient(AsyncMqttClient2 client)
         : client_(std::move(client))
     {}
 
@@ -123,12 +128,9 @@ class SharedAsyncMqttClient : public std::enable_shared_from_this<SharedAsyncMqt
     boost::asio::awaitable<Error> async_close(std::shared_ptr<ProxyState> state)
     {
       // Remove the proxy state from the list of proxies
-      proxies_.erase(
-          std::remove_if(
-              proxies_.begin(),
-              proxies_.end(),
-              [&state](const std::weak_ptr<ProxyState>& weak_proxy) { return weak_proxy.lock() == state; }),
-          proxies_.end());
+      std::erase_if(proxies_, [&state](const std::weak_ptr<ProxyState>& weak_proxy) {
+        return weak_proxy.lock() == state;
+      });
 
       co_return Error{};
     }
@@ -169,8 +171,8 @@ class SharedAsyncMqttClient : public std::enable_shared_from_this<SharedAsyncMqt
 
       const auto& packet = result->get<PublishPacket>();
 
-      // TODO: This is a naive implementation that iterates through all proxies and their topics for every received
-      // packet.
+      // TODO(pbiel): This is a naive implementation that iterates through all proxies and their topics for every
+      // received packet.
       for (const auto& weak_proxy : proxies_) {
         if (auto proxy = weak_proxy.lock()) {
           for (const auto& topic : proxy->topics()) {
