@@ -2,6 +2,7 @@
 
 #include <hacpp/async_mqtt_client.h>
 
+#include <boost/asio/io_context.hpp>
 #include <boost/json.hpp>
 
 #include <initializer_list>
@@ -156,10 +157,10 @@ class EntityCfg
     boost::json::object obj_;
 };
 
-template <typename Impl>
+template <typename Impl, typename Client>
 class Entity
 {
-    explicit Entity(ClientType client)
+    explicit Entity(Client client)
         : client_{std::move(client)}
     {}
     friend Impl;
@@ -261,7 +262,7 @@ class Entity
     }
 
   private:
-    ClientType client_;
+    Client client_;
 };
 
 } // namespace hacpp::mqtt

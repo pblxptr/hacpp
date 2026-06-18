@@ -12,18 +12,8 @@
 
 namespace hacpp::mqtt {
 
-class Sensor : protected Entity<Sensor>
+struct SensorCfg
 {
-    using Base = Entity<Sensor>;
-    friend Base;
-
-  public:
-    using Base::async_close;
-    using Base::async_discovery;
-    using Base::async_setup;
-    using Base::async_subscribe;
-    using Base::async_update_availability;
-    using Base::executor;
     struct Opt
     {
         static constexpr Property StateTopic{"state_topic"};
@@ -42,8 +32,24 @@ class Sensor : protected Entity<Sensor>
         QoS qos;
         EntityCfg cfg;
     };
+};
 
-    Sensor(Config config, ClientType client)
+template <typename Client = ClientType>
+class Sensor : protected Entity<Sensor<Client>, Client>
+{
+    using Base = Entity<Sensor<Client>, Client>;
+    using Base::async_publish;
+    using Base::async_recv;
+    friend Base;
+
+  public:
+    using Base::async_close;
+    using Base::async_discovery;
+    using Base::async_setup;
+    using Base::async_subscribe;
+    using Base::async_update_availability;
+    using Base::executor;
+    Sensor(SensorCfg::Config config, Client client)
         : Base{std::move(client)}
         , config_(std::move(config))
     {}
@@ -55,7 +61,7 @@ class Sensor : protected Entity<Sensor>
 
     boost::asio::awaitable<Error> async_update_state(std::string state)
     {
-      co_return co_await async_publish(config_.cfg[Opt::StateTopic], std::move(state), config_.qos);
+      co_return co_await async_publish(config_.cfg[SensorCfg::Opt::StateTopic], std::move(state), config_.qos);
     }
 
   protected:
@@ -64,7 +70,7 @@ class Sensor : protected Entity<Sensor>
       auto json = config_.cfg.json();
 
       co_return co_await async_publish(
-          default_component_discovery_topic(Defs::Component, config_.unique_id),
+          default_component_discovery_topic(SensorCfg::Defs::Component, config_.unique_id),
           json,
           config_.qos);
     }
@@ -87,14 +93,14 @@ class Sensor : protected Entity<Sensor>
     }
 
   private:
-    Config config_;
+    SensorCfg::Config config_;
 };
 
-template <>
-class Factory<Sensor>
+template <typename Client>
+class Factory<Sensor, Client>
 {
   public:
-    Factory(std::string unique_id, ClientType client)
+    Factory(std::string unique_id, Client client)
         : unique_id_(std::move(unique_id))
         , client_(std::move(client))
     {}
@@ -108,18 +114,24 @@ class Factory<Sensor>
 
     auto create()
     {
-      return Sensor{
-          Sensor::Config{.unique_id = unique_id_, .qos = qos_, .cfg = cfg_},
+      // clang-format off
+      return Sensor<Client>{
+          SensorCfg::Config{
+            .unique_id = unique_id_,
+            .qos = qos_,
+            .cfg = cfg_
+          },
           std::move(client_)
+          // clang-format on
       };
     }
 
   private:
     std::string unique_id_;
     EntityCfg cfg_{
-        {Sensor::Opt::StateTopic, default_component_state_topic(Sensor::Defs::Component, unique_id_)}
+        {SensorCfg::Opt::StateTopic, default_component_state_topic(SensorCfg::Defs::Component, unique_id_)}
     };
     QoS qos_ = QoS::at_most_once;
-    ClientType client_;
+    Client client_;
 };
 } // namespace hacpp::mqtt

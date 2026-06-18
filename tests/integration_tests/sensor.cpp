@@ -28,6 +28,7 @@ using hacpp::mqtt::Factory;
 using hacpp::mqtt::PublishPacket;
 using hacpp::mqtt::QoS;
 using hacpp::mqtt::Sensor;
+using hacpp::mqtt::SensorCfg;
 using hacpp::mqtt::TopicSubopts;
 
 constexpr auto UniqueId = "sensor_unique_id";
@@ -48,9 +49,9 @@ boost::asio::awaitable<std::shared_ptr<ClientType>> get_verifier(boost::asio::an
   REQUIRE(!err);
 
   auto sub_topics = std::vector<TopicSubopts>{
-      {default_component_discovery_topic(Sensor::Defs::Component,    UniqueId), QoS::at_most_once},
-      {default_component_state_topic(Sensor::Defs::Component,        UniqueId), QoS::at_most_once},
-      {default_component_availability_topic(Sensor::Defs::Component, UniqueId), QoS::at_most_once}
+      {default_component_discovery_topic(SensorCfg::Defs::Component,    UniqueId), QoS::at_most_once},
+      {default_component_state_topic(SensorCfg::Defs::Component,        UniqueId), QoS::at_most_once},
+      {default_component_availability_topic(SensorCfg::Defs::Component, UniqueId), QoS::at_most_once}
   };
 
   err = co_await client->async_subscribe(sub_topics);
@@ -94,10 +95,10 @@ TEST_CASE("Sensor provides all required options during discovery", "[sensor]")
 
         // Assert
         REQUIRE(!err);
-        REQUIRE(packet.topic() == default_component_discovery_topic(Sensor::Defs::Component, UniqueId));
+        REQUIRE(packet.topic() == default_component_discovery_topic(SensorCfg::Defs::Component, UniqueId));
         auto pobj = boost::json::parse(packet.payload());
-        REQUIRE(pobj.as_object().contains(Sensor::Opt::StateTopic.key));
-        REQUIRE(!pobj.as_object()[Sensor::Opt::StateTopic.key].as_string().empty());
+        REQUIRE(pobj.as_object().contains(SensorCfg::Opt::StateTopic.key));
+        REQUIRE(!pobj.as_object()[SensorCfg::Opt::StateTopic.key].as_string().empty());
 
         co_await sensor.async_close();
         co_await verifier_client->async_close();
@@ -135,7 +136,7 @@ TEST_CASE("Sensor can update its state", "[sensor]")
 
         // Assert
         REQUIRE(!err);
-        REQUIRE(packet.topic() == sensor.config().at(Sensor::Opt::StateTopic));
+        REQUIRE(packet.topic() == sensor.config().at(SensorCfg::Opt::StateTopic));
         REQUIRE(packet.payload() == "12.5");
 
         co_await sensor.async_close();
@@ -164,7 +165,7 @@ TEST_CASE("Sensor availability", "[sensor]")
         auto sensor = Factory<Sensor>(UniqueId, std::move(entity_client))
                           .set(Availability::Opt::Topic,
                                default_component_availability_topic(
-                                   Sensor::Defs::Component, UniqueId))
+                                   SensorCfg::Defs::Component, UniqueId))
                           .create();
         // clang-format on
         auto err_disc = co_await sensor.async_discovery();
@@ -179,7 +180,7 @@ TEST_CASE("Sensor availability", "[sensor]")
 
           // Assert
           REQUIRE(!err);
-          REQUIRE(packet.topic() == default_component_availability_topic(Sensor::Defs::Component, UniqueId));
+          REQUIRE(packet.topic() == default_component_availability_topic(SensorCfg::Defs::Component, UniqueId));
           REQUIRE(packet.payload() == Availability::Defs::PayloadAvailable);
         }
 
@@ -191,7 +192,7 @@ TEST_CASE("Sensor availability", "[sensor]")
 
           // Assert
           REQUIRE(!err);
-          REQUIRE(packet.topic() == default_component_availability_topic(Sensor::Defs::Component, UniqueId));
+          REQUIRE(packet.topic() == default_component_availability_topic(SensorCfg::Defs::Component, UniqueId));
           REQUIRE(packet.payload() == Availability::Defs::PayloadNotAvailable);
         }
 

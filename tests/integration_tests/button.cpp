@@ -24,6 +24,7 @@ namespace {
 
 using hacpp::mqtt::Availability;
 using hacpp::mqtt::Button;
+using hacpp::mqtt::ButtonCfg;
 using hacpp::mqtt::ClientType;
 using hacpp::mqtt::default_component_availability_topic;
 using hacpp::mqtt::default_component_command_topic;
@@ -51,9 +52,9 @@ boost::asio::awaitable<std::shared_ptr<ClientType>> get_verifier(boost::asio::an
   REQUIRE(!err);
 
   auto sub_topics = std::vector<TopicSubopts>{
-      {default_component_discovery_topic(Button::Defs::Component,    UniqueId), QoS::at_most_once},
-      {default_component_command_topic(Button::Defs::Component,      UniqueId), QoS::at_most_once},
-      {default_component_availability_topic(Button::Defs::Component, UniqueId), QoS::at_most_once}
+      {default_component_discovery_topic(ButtonCfg::Defs::Component,    UniqueId), QoS::at_most_once},
+      {default_component_command_topic(ButtonCfg::Defs::Component,      UniqueId), QoS::at_most_once},
+      {default_component_availability_topic(ButtonCfg::Defs::Component, UniqueId), QoS::at_most_once}
   };
 
   err = co_await client->async_subscribe(sub_topics);
@@ -98,10 +99,10 @@ TEST_CASE("Button provides all required options during discovery", "[button]")
 
         // Assert
         REQUIRE(!err);
-        REQUIRE(packet.topic() == default_component_discovery_topic(Button::Defs::Component, UniqueId));
+        REQUIRE(packet.topic() == default_component_discovery_topic(ButtonCfg::Defs::Component, UniqueId));
         auto pobj = boost::json::parse(packet.payload());
-        REQUIRE(pobj.as_object().contains(Button::Opt::CommandTopic.key));
-        REQUIRE(!pobj.as_object()[Button::Opt::CommandTopic.key].as_string().empty());
+        REQUIRE(pobj.as_object().contains(ButtonCfg::Opt::CommandTopic.key));
+        REQUIRE(!pobj.as_object()[ButtonCfg::Opt::CommandTopic.key].as_string().empty());
 
         co_await button.async_close();
         co_await verifier_client->async_close();
@@ -117,7 +118,7 @@ TEST_CASE("Button can receive press command", "[button]")
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
-  auto button = std::shared_ptr<Button>{};
+  auto button = std::shared_ptr<Button<>>{};
   static constexpr auto default_delay = std::chrono::milliseconds{100};
 
   boost::asio::co_spawn(
@@ -129,7 +130,7 @@ TEST_CASE("Button can receive press command", "[button]")
         auto verifier_client = co_await get_verifier(strand);
         bool pressed = false;
         // clang-format off
-        button = std::make_shared<Button>(Factory<Button>(UniqueId, std::move(entity_client))
+        button = std::make_shared<Button<>>(Factory<Button>(UniqueId, std::move(entity_client))
                 .on_press([&pressed](this auto /* self */) -> boost::asio::awaitable<void> {
                   pressed = true;
                   co_return;
@@ -145,8 +146,8 @@ TEST_CASE("Button can receive press command", "[button]")
 
         // Act
         auto err_pub = co_await verifier_client->async_publish(
-            default_component_command_topic(Button::Defs::Component, UniqueId),
-            Button::Defs::PayloadPress);
+            default_component_command_topic(ButtonCfg::Defs::Component, UniqueId),
+            ButtonCfg::Defs::PayloadPress);
         REQUIRE(!err_pub);
 
         // Give some time for packet delivery and processing
@@ -183,7 +184,7 @@ TEST_CASE("Button availability", "[button]")
         auto button = Factory<Button>(UniqueId, std::move(entity_client))
                           .set(Availability::Opt::Topic,
                                default_component_availability_topic(
-                                   Button::Defs::Component, UniqueId))
+                                   ButtonCfg::Defs::Component, UniqueId))
                           .create();
         // clang-format on
         auto err_disc = co_await button.async_discovery();
@@ -198,7 +199,7 @@ TEST_CASE("Button availability", "[button]")
 
           // Assert
           REQUIRE(!err);
-          REQUIRE(packet.topic() == default_component_availability_topic(Button::Defs::Component, UniqueId));
+          REQUIRE(packet.topic() == default_component_availability_topic(ButtonCfg::Defs::Component, UniqueId));
           REQUIRE(packet.payload() == Availability::Defs::PayloadAvailable);
         }
 
@@ -210,7 +211,7 @@ TEST_CASE("Button availability", "[button]")
 
           // Assert
           REQUIRE(!err);
-          REQUIRE(packet.topic() == default_component_availability_topic(Button::Defs::Component, UniqueId));
+          REQUIRE(packet.topic() == default_component_availability_topic(ButtonCfg::Defs::Component, UniqueId));
           REQUIRE(packet.payload() == Availability::Defs::PayloadNotAvailable);
         }
 
