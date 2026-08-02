@@ -4,9 +4,9 @@
 
 #include <boost/asio.hpp>
 
-inline auto config() -> hacpp::mqtt::AsyncMqttClient2::Config
+inline auto config() -> hacpp::mqtt::AsyncMqttClient::Config
 {
-  return hacpp::mqtt::AsyncMqttClient2::Config{
+  return hacpp::mqtt::AsyncMqttClient::Config{
       .host = "localhost",
       .port = "1883",
       .username = "test_user",

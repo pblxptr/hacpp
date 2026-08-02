@@ -28,7 +28,7 @@ using hacpp::mqtt::ErrorCode;
 namespace {
 boost::asio::awaitable<void> require_disconnected_publish(boost::asio::any_io_executor exe)
 {
-  auto client = hacpp::mqtt::AsyncMqttClient2{exe, config()};
+  auto client = hacpp::mqtt::AsyncMqttClient{exe, config()};
 
   auto err = co_await client.async_publish("test/topic", "payload");
 
@@ -39,7 +39,7 @@ boost::asio::awaitable<void> require_disconnected_publish(boost::asio::any_io_ex
 
 boost::asio::awaitable<void> require_disconnected_subscribe(boost::asio::any_io_executor exe)
 {
-  auto client = hacpp::mqtt::AsyncMqttClient2{exe, config()};
+  auto client = hacpp::mqtt::AsyncMqttClient{exe, config()};
   auto topics = std::vector<hacpp::mqtt::TopicSubopts>{
       {"test/topic", async_mqtt::qos::at_most_once}
   };
@@ -57,7 +57,7 @@ TEST_CASE("Client can connect to broker", "[client]")
   // Arrange
   auto io = boost::asio::io_context{};
   auto strand = boost::asio::make_strand(io);
-  auto client = hacpp::mqtt::AsyncMqttClient2{strand, config()};
+  auto client = hacpp::mqtt::AsyncMqttClient{strand, config()};
 
   // NOLINTBEGIN
   boost::asio::co_spawn(
@@ -86,7 +86,7 @@ TEST_CASE("Client cannot connect to broker", "[client]")
     // Arrange
     auto invalid_config = config();
     invalid_config.password = "invalid_password";
-    auto client = hacpp::mqtt::AsyncMqttClient2{strand, invalid_config};
+    auto client = hacpp::mqtt::AsyncMqttClient{strand, invalid_config};
     // NOLINTBEGIN
     boost::asio::co_spawn(
         strand,
@@ -108,7 +108,7 @@ TEST_CASE("Client cannot connect to broker", "[client]")
     // Arrange
     auto unavailable_config = config();
     unavailable_config.host = "invalid_host";
-    auto client = hacpp::mqtt::AsyncMqttClient2{strand, unavailable_config};
+    auto client = hacpp::mqtt::AsyncMqttClient{strand, unavailable_config};
     // NOLINTBEGIN
     boost::asio::co_spawn(
         strand,
@@ -130,7 +130,7 @@ TEST_CASE("Client cannot connect to broker", "[client]")
     // Arrange
     auto unavailable_config = config();
     unavailable_config.port = "9999";
-    auto client = hacpp::mqtt::AsyncMqttClient2{strand, unavailable_config};
+    auto client = hacpp::mqtt::AsyncMqttClient{strand, unavailable_config};
     // NOLINTBEGIN
     boost::asio::co_spawn(
         strand,
@@ -209,7 +209,7 @@ TEST_CASE("Client can autoreconnect", "[client][autoreconnect]")
 
   auto proxy_config = config();
   proxy_config.port = "1884";
-  auto client = std::make_shared<hacpp::mqtt::AsyncMqttClient2>(strand, proxy_config);
+  auto client = std::make_shared<hacpp::mqtt::AsyncMqttClient>(strand, proxy_config);
 
   run_proxy("setup");
   run_proxy("reconnect");
@@ -285,7 +285,7 @@ TEST_CASE("Publish waits for autoreconnect before sending", "[client][autoreconn
 
   auto proxy_config = config();
   proxy_config.port = "1884";
-  auto client = std::make_shared<hacpp::mqtt::AsyncMqttClient2>(strand, proxy_config);
+  auto client = std::make_shared<hacpp::mqtt::AsyncMqttClient>(strand, proxy_config);
 
   run_proxy("setup");
   run_proxy("reconnect");
@@ -377,7 +377,7 @@ TEST_CASE("Subscribe waits for autoreconnect before sending", "[client][autoreco
 
   auto proxy_config = config();
   proxy_config.port = "1884";
-  auto client = std::make_shared<hacpp::mqtt::AsyncMqttClient2>(strand, proxy_config);
+  auto client = std::make_shared<hacpp::mqtt::AsyncMqttClient>(strand, proxy_config);
 
   run_proxy("setup");
   run_proxy("reconnect");

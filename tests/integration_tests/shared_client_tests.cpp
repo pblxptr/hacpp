@@ -30,9 +30,9 @@ using hacpp::mqtt::TopicSubopts;
 
 namespace {
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers): test dimensions and timeout constants.
-constexpr auto NumberOfProxies = 50;
-constexpr auto NumberOfPublishPerProxy = 100;
-constexpr auto TotalMsgExchange = NumberOfProxies * NumberOfPublishPerProxy;
+constexpr auto NumberOfSharedClients = 50;
+constexpr auto NumberOfPublishesPerSharedClient = 100;
+constexpr auto TotalMsgExchange = NumberOfSharedClients * NumberOfPublishesPerSharedClient;
 constexpr auto ExchangeTimeout = std::chrono::seconds{180};
 constexpr auto PublisherReadyPollInterval = std::chrono::milliseconds{10};
 constexpr auto MainLoopPollInterval = std::chrono::milliseconds{100};
@@ -58,8 +58,8 @@ auto spawn_publisher_thread(std::shared_ptr<std::atomic<bool>> ready_to_publish)
 
   // Fill the list of ids e.g 3 clients each 4 msgs [ 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2 ]
   auto publist = std::vector<int>{};
-  for (auto i = 0; i < NumberOfProxies; i++) {
-    for (auto j = 0; j < NumberOfPublishPerProxy; j++) {
+  for (auto i = 0; i < NumberOfSharedClients; i++) {
+    for (auto j = 0; j < NumberOfPublishesPerSharedClient; j++) {
       publist.push_back(i);
     }
   }
@@ -97,11 +97,13 @@ auto spawn_publisher_thread(std::shared_ptr<std::atomic<bool>> ready_to_publish)
 } // namespace
 
 // NOLINTBEGIN(readability-function-cognitive-complexity)
-TEST_CASE("SharedAsyncMqttClient can handle multiple proxies", "[integration][shared_async_mqtt_client][robustness]")
+TEST_CASE(
+    "SharedAsyncMqttConnection can handle multiple shared clients",
+    "[integration][shared_async_mqtt_connection][robustness]")
 {
   // Arrange
   publish_done = false;
-  auto counters = std::vector<int>(NumberOfProxies, 0);
+  auto counters = std::vector<int>(NumberOfSharedClients, 0);
   auto subscribed_count = std::make_shared<std::atomic<int>>(0);
   auto ready_to_publish = std::make_shared<std::atomic<bool>>(false);
 
@@ -113,35 +115,36 @@ TEST_CASE("SharedAsyncMqttClient can handle multiple proxies", "[integration][sh
   boost::asio::co_spawn(
       strand,
       [strand, &counters, subscribed_count, ready_to_publish](this auto /* self */) -> boost::asio::awaitable<void> {
-        auto shared_client =
-            hacpp::mqtt::SharedAsyncMqttClient::create(hacpp::mqtt::AsyncMqttClient2{strand, config()});
+        auto shared_connection =
+            hacpp::mqtt::SharedAsyncMqttConnection::create(hacpp::mqtt::AsyncMqttClient{strand, config()});
 
-        auto err = co_await shared_client->async_connect();
+        auto err = co_await shared_connection->async_connect();
         REQUIRE(!err);
 
         boost::asio::co_spawn(
-            shared_client->executor(),
-            [shared_client](this auto /* self */) -> boost::asio::awaitable<void> {
+            shared_connection->executor(),
+            [shared_connection](this auto /* self */) -> boost::asio::awaitable<void> {
               while (true) {
-                co_await shared_client->async_recv();
+                co_await shared_connection->async_recv();
               }
             },
             boost::asio::detached);
 
-        for (int i = 0; i < NumberOfProxies; ++i) {
+        for (int i = 0; i < NumberOfSharedClients; ++i) {
           boost::asio::co_spawn(
-              shared_client->executor(),
-              [shared_client, i, &counters, subscribed_count](this auto /* self */) -> boost::asio::awaitable<void> {
-                auto proxy = shared_client->proxy();
+              shared_connection->executor(),
+              [shared_connection, i, &counters, subscribed_count](
+                  this auto /* self */) -> boost::asio::awaitable<void> {
+                auto client = shared_connection->make_client();
                 auto sub_topics = std::vector<TopicSubopts>{
                     {get_command_topic(i), QoS::at_least_once}
                 };
-                auto err = co_await proxy.async_subscribe(std::move(sub_topics));
+                auto err = co_await client.async_subscribe(std::move(sub_topics));
                 REQUIRE(!err);
                 ++(*subscribed_count);
 
                 while (true) {
-                  auto result = co_await proxy.async_recv();
+                  auto result = co_await client.async_recv();
                   if (!result) {
                     co_return;
                   }
@@ -156,7 +159,7 @@ TEST_CASE("SharedAsyncMqttClient can handle multiple proxies", "[integration][sh
         }
 
         auto timer = boost::asio::steady_timer{strand};
-        while (subscribed_count->load() != NumberOfProxies) {
+        while (subscribed_count->load() != NumberOfSharedClients) {
           timer.expires_after(PublisherReadyPollInterval);
           co_await timer.async_wait(boost::asio::use_awaitable);
         }
@@ -217,7 +220,7 @@ TEST_CASE("SharedAsyncMqttClient can handle multiple proxies", "[integration][sh
 
   REQUIRE(total_msgs == TotalMsgExchange);
   for (const auto& count : counters) {
-    REQUIRE(count == NumberOfPublishPerProxy);
+    REQUIRE(count == NumberOfPublishesPerSharedClient);
   }
 }
 // NOLINTEND(readability-function-cognitive-complexity)
