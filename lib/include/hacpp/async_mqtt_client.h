@@ -86,8 +86,9 @@ class AsyncMqttClient
     {}
     AsyncMqttClient(const AsyncMqttClient&) = delete;
     AsyncMqttClient& operator=(const AsyncMqttClient&) = delete;
-    AsyncMqttClient(AsyncMqttClient&&) = default;
-    AsyncMqttClient& operator=(AsyncMqttClient&&) = default;
+    AsyncMqttClient(AsyncMqttClient&&) noexcept = default;
+    AsyncMqttClient& operator=(AsyncMqttClient&&) noexcept = default;
+    ~AsyncMqttClient() = default;
 
     auto executor()
     {

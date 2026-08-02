@@ -93,8 +93,9 @@ class SharedAsyncMqttClient
     explicit SharedAsyncMqttClient(std::shared_ptr<SharedAsyncMqttConnection> shared_connection);
     SharedAsyncMqttClient(const SharedAsyncMqttClient&) = delete;
     SharedAsyncMqttClient& operator=(const SharedAsyncMqttClient&) = delete;
-    SharedAsyncMqttClient(SharedAsyncMqttClient&&) = default;
-    SharedAsyncMqttClient& operator=(SharedAsyncMqttClient&&) = default;
+    SharedAsyncMqttClient(SharedAsyncMqttClient&&) noexcept = default;
+    SharedAsyncMqttClient& operator=(SharedAsyncMqttClient&&) noexcept = default;
+    ~SharedAsyncMqttClient() = default;
 
     auto executor();
     boost::asio::awaitable<Error> async_close();
@@ -120,6 +121,7 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
     SharedAsyncMqttConnection& operator=(const SharedAsyncMqttConnection&) = delete;
     SharedAsyncMqttConnection(SharedAsyncMqttConnection&&) = delete;
     SharedAsyncMqttConnection& operator=(SharedAsyncMqttConnection&&) = delete;
+    ~SharedAsyncMqttConnection() = default;
 
     static std::shared_ptr<SharedAsyncMqttConnection> create(AsyncMqttClient client)
     {
