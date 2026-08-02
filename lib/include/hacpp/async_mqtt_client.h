@@ -42,7 +42,7 @@ auto str(const std::optional<T>& opt) -> std::string
 }
 } // namespace detail
 
-class AsyncMqttClient2
+class AsyncMqttClient
 {
     using Impl = async_mqtt::client<async_mqtt::protocol_version::v5, async_mqtt::protocol::mqtt>;
 
@@ -79,11 +79,15 @@ class AsyncMqttClient2
         bool clean_start{true};
     };
 
-    AsyncMqttClient2(const boost::asio::any_io_executor& exe, Config config)
+    AsyncMqttClient(const boost::asio::any_io_executor& exe, Config config)
         : impl_{exe}
         , config_{std::move(config)}
         , conn_{exe}
     {}
+    AsyncMqttClient(const AsyncMqttClient&) = delete;
+    AsyncMqttClient& operator=(const AsyncMqttClient&) = delete;
+    AsyncMqttClient(AsyncMqttClient&&) = default;
+    AsyncMqttClient& operator=(AsyncMqttClient&&) = default;
 
     auto executor()
     {
@@ -302,6 +306,6 @@ class AsyncMqttClient2
     Connection conn_;
 };
 
-using ClientType = AsyncMqttClient2;
+using ClientType = AsyncMqttClient;
 
 } // namespace hacpp::mqtt
