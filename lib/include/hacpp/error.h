@@ -1,11 +1,12 @@
 #pragma once
 
-#include <async_mqtt/protocol/error.hpp>
+  #include <async_mqtt/protocol/error.hpp>
 
-#include <boost/system/error_code.hpp>
-#include <spdlog/spdlog.h>
+  #include <boost/asio/error.hpp>
+  #include <boost/system/error_code.hpp>
+  #include <spdlog/spdlog.h>
 
-#include <string>
+  #include <string>
 
 namespace hacpp::mqtt {
 
