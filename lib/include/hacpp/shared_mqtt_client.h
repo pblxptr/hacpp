@@ -169,9 +169,8 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
 
       auto& registered_topics = state->topics();
       for (const auto& topic : topics) {
-        auto registered_topic = std::find_if(
-            registered_topics.begin(),
-            registered_topics.end(),
+        auto registered_topic = std::ranges::find_if(
+            registered_topics,
             [&topic](const TopicSubopts& registered) { return registered.topic() == topic.topic(); });
 
         if (registered_topic == registered_topics.end()) {
@@ -181,9 +180,8 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
         }
       }
 
-      const auto registered_client = std::any_of(
-          clients_.begin(),
-          clients_.end(),
+      const auto registered_client = std::ranges::any_of(
+          clients_,
           [&state](const std::weak_ptr<SharedClientState>& weak_client) { return weak_client.lock() == state; });
 
       if (!registered_client) {
