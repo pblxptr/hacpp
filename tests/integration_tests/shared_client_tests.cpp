@@ -125,7 +125,7 @@ TEST_CASE(
             shared_connection->executor(),
             [shared_connection](this auto /* self */) -> boost::asio::awaitable<void> {
               while (true) {
-                co_await shared_connection->async_recv();
+                co_await shared_connection->async_pump_one();
               }
             },
             boost::asio::detached);

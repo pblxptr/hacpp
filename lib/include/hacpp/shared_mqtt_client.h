@@ -175,7 +175,7 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
       co_return err;
     }
 
-    boost::asio::awaitable<void> async_recv()
+    boost::asio::awaitable<void> async_pump_one()
     {
       auto result = co_await client_.async_recv();
 
