@@ -62,14 +62,12 @@
   - The one-shot pump contract is explicit while logical clients still use `SharedAsyncMqttClient::async_recv()`.
   - File: `lib/include/hacpp/shared_mqtt_client.h`.
 
-- [ ] Handle non-publish packets in shared receive dispatch.
-  - `SharedAsyncMqttConnection::async_pump_one()` assumes a successful receive result contains `PublishPacket`.
-  - Guard or ignore non-publish packets explicitly before dispatching by topic.
+- [x] Handle non-publish packets in shared receive dispatch.
+  - `SharedAsyncMqttConnection::async_pump_one()` now logs a warning and skips dispatch for successful non-publish packets.
   - File: `lib/include/hacpp/shared_mqtt_client.h`.
 
-- [ ] Avoid duplicate shared-client registration.
-  - `SharedAsyncMqttConnection::async_subscribe()` registers the same shared client state each time that client subscribes.
-  - Deduplicate registrations or register shared clients during `make_client()`.
+- [x] Avoid duplicate shared-client registration.
+  - `SharedAsyncMqttConnection::async_subscribe()` now refreshes existing topic entries and registers each live shared client state once.
   - File: `lib/include/hacpp/shared_mqtt_client.h`.
 
 - [ ] Remove expired shared clients during dispatch.

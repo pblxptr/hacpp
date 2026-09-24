@@ -9,6 +9,7 @@
 #include <boost/asio/use_awaitable.hpp>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <deque>
 #include <memory>
 #include <utility>
@@ -166,11 +167,28 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
         co_return err;
       };
 
+      auto& registered_topics = state->topics();
       for (const auto& topic : topics) {
-        state->topics().push_back(topic);
+        auto registered_topic = std::find_if(
+            registered_topics.begin(),
+            registered_topics.end(),
+            [&topic](const TopicSubopts& registered) { return registered.topic() == topic.topic(); });
+
+        if (registered_topic == registered_topics.end()) {
+          registered_topics.push_back(topic);
+        } else {
+          *registered_topic = topic;
+        }
       }
 
-      clients_.push_back(state);
+      const auto registered_client = std::any_of(
+          clients_.begin(),
+          clients_.end(),
+          [&state](const std::weak_ptr<SharedClientState>& weak_client) { return weak_client.lock() == state; });
+
+      if (!registered_client) {
+        clients_.push_back(state);
+      }
 
       co_return err;
     }
@@ -188,14 +206,22 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
         co_return;
       }
 
-      const auto& packet = result->get<PublishPacket>();
+      const auto* packet = result->get_if<PublishPacket>();
+      if (packet == nullptr) {
+        result->visit([](auto&& packet) {
+          spdlog::warn(
+              "Received non-publish packet in shared MQTT connection pump, skipping: {}",
+              detail::str(packet));
+        });
+        co_return;
+      }
 
       // TODO(pbiel): This is a naive implementation that iterates through all shared clients and their topics for every
       // received packet.
       for (const auto& weak_client : clients_) {
         if (auto client = weak_client.lock()) {
           for (const auto& topic : client->topics()) {
-            if (topic.topic() == packet.topic()) {
+            if (topic.topic() == packet->topic()) {
               co_await client->queue().push_back(result);
             }
           }
