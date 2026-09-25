@@ -45,10 +45,10 @@
   - This restores command subscriptions for entities such as `button` and `cover`.
   - Files: `lib/include/hacpp/entity.h`, `lib/include/hacpp/button.h`, `lib/include/hacpp/cover.h`.
 
-- [ ] Decide raw client reconnect semantics.
-  - Current raw `AsyncMqttClient2::async_recv()` still returns `ErrorCode::SessionLost` after a successful reconnect.
-  - Entity wrappers treat that as recoverable, but direct client users still see it as an error result.
-  - Decide whether this is intended API behavior or should become transparent at the client layer.
+- [x] Decide raw client reconnect semantics.
+  - No runtime behavior was changed.
+  - Raw `AsyncMqttClient2::async_recv()` intentionally returns `ErrorCode::SessionLost` after a successful reconnect.
+  - Entity wrappers treat that as recoverable and replay setup; direct client users need the same signal to restore session-level state such as subscriptions.
   - File: `lib/include/hacpp/async_mqtt_client.h`.
 
 ## Medium Priority
