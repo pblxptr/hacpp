@@ -70,9 +70,8 @@
   - `SharedAsyncMqttConnection::async_subscribe()` now refreshes existing topic entries and registers each live shared client state once.
   - File: `lib/include/hacpp/shared_mqtt_client.h`.
 
-- [ ] Remove expired shared clients during dispatch.
-  - `SharedAsyncMqttConnection` stores weak shared-client states and can accumulate expired entries.
-  - Clean expired entries during subscribe, close, or dispatch.
+- [x] Remove expired shared clients during dispatch.
+  - `SharedAsyncMqttConnection::async_pump_one()` now removes expired weak shared-client states before dispatch.
   - File: `lib/include/hacpp/shared_mqtt_client.h`.
 
 - [ ] Clarify logical-client close semantics.
