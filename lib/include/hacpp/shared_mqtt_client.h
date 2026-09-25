@@ -144,7 +144,12 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
       return client_.async_connect();
     }
 
-    boost::asio::awaitable<Error> async_close(std::shared_ptr<SharedClientState> state)
+    boost::asio::awaitable<Error> async_close()
+    {
+      co_return co_await client_.async_close();
+    }
+
+    boost::asio::awaitable<Error> async_detach(std::shared_ptr<SharedClientState> state)
     {
       // TODO(pbiel): Consider unsubscribing from topics owned only by this logical shared client.
       std::erase_if(clients_, [&state](const std::weak_ptr<SharedClientState>& weak_client) {
@@ -254,7 +259,7 @@ inline auto SharedAsyncMqttClient::executor()
 
 inline boost::asio::awaitable<Error> SharedAsyncMqttClient::async_close()
 {
-  co_return co_await shared_connection_->async_close(state_);
+  co_return co_await shared_connection_->async_detach(state_);
 }
 
 template <typename... Args>

@@ -222,8 +222,7 @@ class Factory<Cover, Client>
     std::string unique_id_;
     EntityCfg cfg_{
         {CoverCfg::Opt::CommandTopic, default_component_command_topic(CoverCfg::Defs::Component, unique_id_)},
-        // { CoverCfg::Opt::StateTopic,
-        // default_component_state_topic(CoverCfg::Defs::Component, unique_id_) }
+        {CoverCfg::Opt::StateTopic, default_component_state_topic(CoverCfg::Defs::Component, unique_id_)}
     };
     QoS qos_ = QoS::at_least_once;
     Client client_;

@@ -104,6 +104,8 @@ TEST_CASE("Cover provides all required options during discovery", "[cover]")
         auto pobj = boost::json::parse(packet.payload());
         REQUIRE(pobj.as_object().contains(CoverCfg::Opt::CommandTopic.key));
         REQUIRE(!pobj.as_object()[CoverCfg::Opt::CommandTopic.key].as_string().empty());
+        REQUIRE(pobj.as_object().contains(CoverCfg::Opt::StateTopic.key));
+        REQUIRE(!pobj.as_object()[CoverCfg::Opt::StateTopic.key].as_string().empty());
 
         co_await cover.async_close();
         co_await verifier_client->async_close();
@@ -218,9 +220,6 @@ TEST_CASE("Cover state update", "[cover]")
         auto verifier_client = co_await get_verifier(strand);
         // clang-format off
         auto cover = Factory<Cover>(UniqueId, std::move(entity_client))
-                         .set(CoverCfg::Opt::StateTopic,
-                              default_component_state_topic(
-                                  CoverCfg::Defs::Component, UniqueId))
                          .create();
         // clang-format on
         auto err_disc = co_await cover.async_discovery();

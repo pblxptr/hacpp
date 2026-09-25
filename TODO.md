@@ -74,9 +74,9 @@
   - `SharedAsyncMqttConnection::async_pump_one()` now removes expired weak shared-client states before dispatch.
   - File: `lib/include/hacpp/shared_mqtt_client.h`.
 
-- [ ] Clarify logical-client close semantics.
-  - `SharedAsyncMqttClient::async_close()` unregisters the logical shared client, but does not close the MQTT connection.
-  - Decide whether the current name is acceptable for entity interface compatibility or whether an internal detach/unregister helper should make the distinction explicit.
+- [x] Clarify logical-client close semantics.
+  - `SharedAsyncMqttConnection::async_close()` now closes the underlying MQTT client.
+  - `SharedAsyncMqttClient::async_close()` keeps the entity/client interface and delegates to `SharedAsyncMqttConnection::async_detach()` to unregister only the logical client.
   - File: `lib/include/hacpp/shared_mqtt_client.h`.
 
 - [x] Remove duplicated/unreachable error branch in `async_recv()`.
@@ -99,9 +99,8 @@
   - Device metadata is serialized into the Home Assistant discovery `device` object.
   - File: `lib/include/hacpp/entity.h`.
 
-- [ ] Provide sane default `state_topic` for `Cover` factory.
-  - Currently commented out, requiring manual configuration for state updates.
-  - Add default unless explicitly overridden.
+- [x] Provide sane default `state_topic` for `Cover` factory.
+  - `Factory<Cover>` now defaults `state_topic` to the component state topic while still allowing explicit override via `set()`.
   - File: `lib/include/hacpp/cover.h`.
 
 ## Suggested Validation After Fixes
