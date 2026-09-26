@@ -149,6 +149,16 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
       co_return co_await client_.async_close();
     }
 
+    boost::asio::awaitable<void> async_run()
+    {
+      while (true) {
+        auto err = co_await async_pump_one_impl();
+        if (err) {
+          co_return;
+        }
+      }
+    }
+
     boost::asio::awaitable<Error> async_detach(std::shared_ptr<SharedClientState> state)
     {
       // TODO(pbiel): Consider unsubscribing from topics owned only by this logical shared client.
@@ -212,6 +222,12 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
 
     boost::asio::awaitable<void> async_pump_one()
     {
+      co_await async_pump_one_impl();
+    }
+
+  private:
+    boost::asio::awaitable<Error> async_pump_one_impl()
+    {
       remove_expired_clients();
 
       auto result = co_await client_.async_recv();
@@ -227,7 +243,7 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
             spdlog::debug("Shared client has expired, skipping");
           }
         }
-        co_return;
+        co_return result.error() == ErrorCode::SessionReset ? ErrorCode::Success : result.error();
       }
 
       const auto* packet = result->get_if<PublishPacket>();
@@ -237,7 +253,7 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
               "Received non-publish packet in shared MQTT connection pump, skipping: {}",
               detail::str(packet));
         });
-        co_return;
+        co_return ErrorCode::Success;
       }
 
       // TODO(pbiel): This is a naive implementation that iterates through all shared clients and their topics for every
@@ -251,9 +267,10 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
           }
         }
       }
+
+      co_return ErrorCode::Success;
     }
 
-  private:
     void remove_expired_clients()
     {
       std::erase_if(
@@ -295,7 +312,6 @@ boost::asio::awaitable<Error> SharedAsyncMqttClient::async_subscribe(Args... arg
 inline boost::asio::awaitable<RecvResult> SharedAsyncMqttClient::async_recv()
 {
   co_return co_await shared_connection_->async_recv(state_);
-  // co_return co_await state_->queue().pop_front();
 }
 
 } // namespace hacpp::mqtt

@@ -26,7 +26,7 @@ struct Property
 
 struct Device
 {
-    std::string configuraton_url;
+    std::string configuration_url;
     std::vector<std::string> connections;
     std::string hw_version;
     std::vector<std::string> identifiers;
@@ -83,15 +83,6 @@ class EntityCfg
       return *this;
     }
 
-    auto operator[](const Property& prop)
-    {
-      if (prop.obj_key.empty()) {
-        return boost::json::value_to<std::string>(obj_[prop.key]);
-      }
-
-      return boost::json::value_to<std::string>(obj_[prop.obj_key].as_object()[prop.key]);
-    }
-
     [[nodiscard]] auto at(const Property& prop) const
     {
       if (prop.obj_key.empty()) {
@@ -123,7 +114,7 @@ class EntityCfg
         json_device[key] = std::move(json_values);
       };
 
-      set_string("configuration_url", device.configuraton_url);
+      set_string("configuration_url", device.configuration_url);
       set_string_array("connections", device.connections);
       set_string("hw_version", device.hw_version);
       set_string_array("identifiers", device.identifiers);
@@ -243,9 +234,9 @@ class Entity
       }
     }
 
-    boost::asio::awaitable<void> async_close()
+    boost::asio::awaitable<Error> async_close()
     {
-      co_await client_.async_close();
+      co_return co_await client_.async_close();
     }
 
   private:
@@ -256,8 +247,8 @@ class Entity
 
     boost::asio::awaitable<Error> handle_err(Error err)
     {
-      if (err == ErrorCode::SessionLost) {
-        spdlog::debug("Session lost, triggering setup");
+      if (err == ErrorCode::SessionReset) {
+        spdlog::debug("Session reset, triggering setup");
         co_return co_await async_setup();
       }
 

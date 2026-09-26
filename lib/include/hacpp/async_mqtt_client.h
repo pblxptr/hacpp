@@ -55,7 +55,7 @@ class AsyncMqttClient
 
     struct Connection
     {
-        static constexpr auto DefaultMaxAutoreconnectAttemps = 10;
+        static constexpr auto DefaultMaxAutoreconnectAttempts = 10;
 
         explicit Connection(const boost::asio::any_io_executor& exe)
             : autorec_wait_timer{exe}
@@ -63,7 +63,7 @@ class AsyncMqttClient
 
         State state{State::Closed};
         int attempt{0};
-        int max_attempts{DefaultMaxAutoreconnectAttemps};
+        int max_attempts{DefaultMaxAutoreconnectAttempts};
         boost::asio::steady_timer autorec_wait_timer;
     };
 
@@ -289,7 +289,7 @@ class AsyncMqttClient
           conn_.state = State::Connected;
           conn_.autorec_wait_timer.cancel();
           spdlog::debug("Reconnection successful");
-          co_return ErrorCode::SessionLost;
+          co_return ErrorCode::SessionReset;
         }
 
         spdlog::debug("Reconnecting failed: {}", err.message());

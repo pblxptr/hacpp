@@ -67,8 +67,8 @@ class BinarySensor : protected Entity<BinarySensor<Client>, Client>
     boost::asio::awaitable<Error> async_update_state(bool state)
     {
       co_return co_await async_publish(
-          config_.cfg[BinarySensorCfg::Opt::StateTopic],
-          state ? config_.cfg[BinarySensorCfg::Opt::PayloadOn] : config_.cfg[BinarySensorCfg::Opt::PayloadOff],
+          config_.cfg.at(BinarySensorCfg::Opt::StateTopic),
+          state ? config_.cfg.at(BinarySensorCfg::Opt::PayloadOn) : config_.cfg.at(BinarySensorCfg::Opt::PayloadOff),
           config_.qos);
     }
 

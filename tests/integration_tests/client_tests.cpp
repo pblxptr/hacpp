@@ -229,7 +229,7 @@ TEST_CASE("Client can autoreconnect", "[client][autoreconnect]")
           auto res = co_await client->async_recv();
           if (!res) {
             spdlog::info("Recv error in test: {}", res.error().message());
-            if (res.error() == ErrorCode::SessionLost) {
+            if (res.error() == ErrorCode::SessionReset) {
               reconnected_signaled = true;
               break;
             }
@@ -306,7 +306,7 @@ TEST_CASE("Publish waits for autoreconnect before sending", "[client][autoreconn
           auto res = co_await client->async_recv();
           if (!res) {
             spdlog::info("Recv error in test: {}", res.error().message());
-            if (res.error() == ErrorCode::SessionLost) {
+            if (res.error() == ErrorCode::SessionReset) {
               reconnected_signaled = true;
               break;
             }
@@ -370,7 +370,7 @@ TEST_CASE("Publish waits for autoreconnect before sending", "[client][autoreconn
   CHECK(!publish_err);
 }
 
-TEST_CASE("Subscribe waits for autoreconnect before sending", "[client][autoreconnect_defere_subscribe]")
+TEST_CASE("Subscribe waits for autoreconnect before sending", "[client][autoreconnect_defer_subscribe]")
 {
   // Arrange
   auto io = boost::asio::io_context{};
@@ -398,7 +398,7 @@ TEST_CASE("Subscribe waits for autoreconnect before sending", "[client][autoreco
           auto res = co_await client->async_recv();
           if (!res) {
             spdlog::info("Recv error in test: {}", res.error().message());
-            if (res.error() == ErrorCode::SessionLost) {
+            if (res.error() == ErrorCode::SessionReset) {
               reconnected_signaled = true;
               break;
             }

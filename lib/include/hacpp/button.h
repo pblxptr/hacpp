@@ -80,7 +80,7 @@ class Button : protected Entity<Button<Client>, Client>
     boost::asio::awaitable<Error> async_subscribe_impl()
     {
       auto sub_topics = std::vector<TopicSubopts>{
-          {config_.cfg[ButtonCfg::Opt::CommandTopic], config_.qos}
+          {config_.cfg.at(ButtonCfg::Opt::CommandTopic), config_.qos}
       };
 
       co_return co_await async_subscribe(sub_topics);
@@ -98,8 +98,8 @@ class Button : protected Entity<Button<Client>, Client>
         res->visit([&](auto&& packet) {
           using PacketType = std::decay_t<decltype(packet)>;
           if constexpr (std::is_same_v<PacketType, async_mqtt::v5::publish_packet>) {
-            if (packet.topic() == config_.cfg[ButtonCfg::Opt::CommandTopic] &&
-                packet.payload() == config_.cfg[ButtonCfg::Opt::PayloadPress]) {
+            if (packet.topic() == config_.cfg.at(ButtonCfg::Opt::CommandTopic) &&
+                packet.payload() == config_.cfg.at(ButtonCfg::Opt::PayloadPress)) {
               if (config_.handler) {
                 boost::asio::co_spawn(this->executor(), config_.handler(), boost::asio::detached);
               }

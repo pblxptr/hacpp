@@ -61,7 +61,7 @@ class Sensor : protected Entity<Sensor<Client>, Client>
 
     boost::asio::awaitable<Error> async_update_state(std::string state)
     {
-      co_return co_await async_publish(config_.cfg[SensorCfg::Opt::StateTopic], std::move(state), config_.qos);
+      co_return co_await async_publish(config_.cfg.at(SensorCfg::Opt::StateTopic), std::move(state), config_.qos);
     }
 
   protected:

@@ -182,7 +182,6 @@ TEST_CASE("Multiple entities using the same shared connection are able to recove
 {
   // Arrange
   auto io = boost::asio::io_context{};
-  static auto keep_run = std::atomic<bool>{true};
   auto strand = boost::asio::make_strand(io);
   auto proxy_config = config();
   proxy_config.port = "1884";
@@ -226,9 +225,7 @@ TEST_CASE("Multiple entities using the same shared connection are able to recove
         boost::asio::co_spawn(
             strand,
             [connection]() -> boost::asio::awaitable<void> {
-              while (keep_run) {
-                co_await connection->async_pump_one();
-              }
+              co_await connection->async_run();
             },
             boost::asio::detached);
 

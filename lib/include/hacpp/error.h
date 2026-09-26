@@ -14,13 +14,13 @@ enum class ErrorCode
 {
   Success = 0,            /* No Error */
   NotAuthorized,          /* E.g credentials */
-  HostNotFound,           /* E.g. host doe not exist*/
+  HostNotFound,           /* E.g. host does not exist */
   ConnectionRefused,      /* E.g. host listens on a different port */
   PacketNotAllowedToSend, // TODO(pbiel): Perhaps too specific?
   NotConnected,           /* Not connected */
-  InvalidConfig,          /* Invaid config */
+  InvalidConfig,          /* Invalid config */
   Disconnected,           /* Disconnected */
-  SessionLost,            /* When client reconnected but the session is lost */
+  SessionReset,           /* Reconnected, but subscriptions and setup need to be restored */
   InternalError,          /* Internal error, e.g., logic error, invalid state, etc. */
   InvalidPacket,          /* Received invalid packet */
   UnknownError
@@ -65,7 +65,8 @@ class ErrorCategory : public boost::system::error_category
         case ErrorCode::PacketNotAllowedToSend: return "packet_not_allowed_to_send";
         case ErrorCode::NotConnected:           return "not_connected";
         case ErrorCode::InvalidConfig:          return "invalid_config";
-        case ErrorCode::SessionLost:            return "session_lost";
+        case ErrorCode::Disconnected:           return "disconnected";
+        case ErrorCode::SessionReset:           return "session_reset";
         case ErrorCode::InternalError:          return "internal_error";
         case ErrorCode::InvalidPacket:          return "invalid_packet";
         case ErrorCode::UnknownError:           return "unknown_error";

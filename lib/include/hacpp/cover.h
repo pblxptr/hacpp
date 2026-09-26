@@ -87,7 +87,7 @@ class Cover : protected Entity<Cover<Client>, Client>
         co_return ErrorCode::InvalidConfig;
       }
 
-      co_return co_await async_publish(config_.cfg[CoverCfg::Opt::StateTopic], state, config_.qos);
+      co_return co_await async_publish(config_.cfg.at(CoverCfg::Opt::StateTopic), state, config_.qos);
     }
 
   public:
@@ -102,7 +102,7 @@ class Cover : protected Entity<Cover<Client>, Client>
         res->visit([&](auto&& packet) {
           using PacketType = std::decay_t<decltype(packet)>;
           if constexpr (std::is_same_v<PacketType, async_mqtt::v5::publish_packet>) {
-            if (packet.topic() == config_.cfg[CoverCfg::Opt::CommandTopic]) {
+            if (packet.topic() == config_.cfg.at(CoverCfg::Opt::CommandTopic)) {
               auto payload = packet.payload();
               auto cmd = std::string_view{payload.data(), payload.size()};
               dispatch(cmd);
@@ -117,15 +117,15 @@ class Cover : protected Entity<Cover<Client>, Client>
   protected:
     void dispatch(std::string_view cmd)
     {
-      if (cmd == config_.cfg[CoverCfg::Opt::PayloadOpen]) {
+      if (cmd == config_.cfg.at(CoverCfg::Opt::PayloadOpen)) {
         if (config_.on_open) {
           boost::asio::co_spawn(this->executor(), config_.on_open(), boost::asio::detached);
         }
-      } else if (cmd == config_.cfg[CoverCfg::Opt::PayloadClose]) {
+      } else if (cmd == config_.cfg.at(CoverCfg::Opt::PayloadClose)) {
         if (config_.on_close) {
           boost::asio::co_spawn(this->executor(), config_.on_close(), boost::asio::detached);
         }
-      } else if (cmd == config_.cfg[CoverCfg::Opt::PayloadStop]) {
+      } else if (cmd == config_.cfg.at(CoverCfg::Opt::PayloadStop)) {
         if (config_.on_stop) {
           boost::asio::co_spawn(this->executor(), config_.on_stop(), boost::asio::detached);
         }
@@ -145,7 +145,7 @@ class Cover : protected Entity<Cover<Client>, Client>
     boost::asio::awaitable<Error> async_subscribe_impl()
     {
       auto sub_topics = std::vector<TopicSubopts>{
-          {config_.cfg[CoverCfg::Opt::CommandTopic], config_.qos}
+          {config_.cfg.at(CoverCfg::Opt::CommandTopic), config_.qos}
       };
 
       co_return co_await async_subscribe(sub_topics);
