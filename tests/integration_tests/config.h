@@ -14,10 +14,3 @@ inline auto config() -> hacpp::mqtt::AsyncMqttClient::Config
       .keep_alive = 0,
       .clean_start = true};
 }
-
-inline auto rethrow(const std::exception_ptr& eptr)
-{
-  if (eptr) {
-    std::rethrow_exception(eptr);
-  }
-}

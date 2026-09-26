@@ -1,4 +1,5 @@
 #include "config.h"
+#include "helpers/tools.hpp"
 
 #include <hacpp/async_mqtt_client.h>
 #include <hacpp/entity.h>
@@ -81,22 +82,6 @@ class TestEntity : protected Entity<TestEntity, ClientType>
     Config config_{.qos = QoS::at_most_once, .cfg = {}};
     std::shared_ptr<SetupCounters> counters_;
 };
-
-void run_proxy(const std::string& cmd)
-{
-  auto path = std::string{"/home/env/manage_proxy.py"};
-
-  if (!std::filesystem::exists(path)) {
-    path = std::string{INTEGRATION_TEST_ENV_DIR} + "/manage_proxy.py";
-  }
-
-  auto full_cmd = "python3 " + path + " " + cmd;
-  // NOLINTNEXTLINE(concurrency-mt-unsafe, cert-env33-c): integration test invokes the proxy helper process.
-  auto res = std::system(full_cmd.c_str());
-  if (res != 0) {
-    spdlog::error("Failed to run proxy command: {} (exit code: {})", full_cmd, res);
-  }
-}
 
 boost::asio::awaitable<void> wait_for_setup_replay(
     boost::asio::any_io_executor exe,

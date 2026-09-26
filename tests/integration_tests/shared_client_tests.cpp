@@ -1,4 +1,5 @@
 #include "config.h"
+#include "helpers/tools.hpp"
 
 #include <hacpp/async_mqtt_client.h>
 #include <hacpp/shared_mqtt_client.h>

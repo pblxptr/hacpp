@@ -1,4 +1,5 @@
 #include "config.h"
+#include "helpers/tools.hpp"
 
 #include <async_mqtt/protocol/packet/qos.hpp>
 #include <hacpp/async_mqtt_client.h>
@@ -168,37 +169,37 @@ TEST_CASE("Client is not operational when disconnected", "[client]")
 
 namespace {
 // Helper to run proxy commands
-void run_proxy(const std::string& cmd)
-{
-  std::string path = "/home/env/manage_proxy.py";
+// void run_proxy(const std::string& cmd)
+// {
+//   std::string path = "/home/env/manage_proxy.py";
 
-  if (!std::filesystem::exists(path)) {
-    path = std::string(INTEGRATION_TEST_ENV_DIR) + "/manage_proxy.py";
-  }
+//   if (!std::filesystem::exists(path)) {
+//     path = std::string(INTEGRATION_TEST_ENV_DIR) + "/manage_proxy.py";
+//   }
 
-  spdlog::debug("Running proxy command: '{}' using script: {}", cmd, path);
+//   spdlog::debug("Running proxy command: '{}' using script: {}", cmd, path);
 
-  auto full_cmd = "python3 " + path + " " + cmd;
-  // NOLINTNEXTLINE(concurrency-mt-unsafe, cert-env33-c): integration test invokes the proxy helper process.
-  int res = std::system(full_cmd.c_str());
+//   auto full_cmd = "python3 " + path + " " + cmd;
+//   // NOLINTNEXTLINE(concurrency-mt-unsafe, cert-env33-c): integration test invokes the proxy helper process.
+//   int res = std::system(full_cmd.c_str());
 
-  if (res != 0) {
-    spdlog::error("Failed to run proxy command: {} (exit code: {})", full_cmd, res);
+//   if (res != 0) {
+//     spdlog::error("Failed to run proxy command: {} (exit code: {})", full_cmd, res);
 
-    // Diagnostic: Check if python3 actually exists in a common location
-    if (std::filesystem::exists("/usr/bin/python3")) {
-      spdlog::info("/usr/bin/python3 exists. Attempting with absolute path...");
-      full_cmd = "/usr/bin/python3 " + path + " " + cmd;
-      // NOLINTNEXTLINE(concurrency-mt-unsafe, cert-env33-c): integration test invokes the proxy helper process.
-      res = std::system(full_cmd.c_str());
-      if (res == 0) {
-        return;
-      }
-    } else {
-      spdlog::error("/usr/bin/python3 DOES NOT EXIST in the container!");
-    }
-  }
-}
+//     // Diagnostic: Check if python3 actually exists in a common location
+//     if (std::filesystem::exists("/usr/bin/python3")) {
+//       spdlog::info("/usr/bin/python3 exists. Attempting with absolute path...");
+//       full_cmd = "/usr/bin/python3 " + path + " " + cmd;
+//       // NOLINTNEXTLINE(concurrency-mt-unsafe, cert-env33-c): integration test invokes the proxy helper process.
+//       res = std::system(full_cmd.c_str());
+//       if (res == 0) {
+//         return;
+//       }
+//     } else {
+//       spdlog::error("/usr/bin/python3 DOES NOT EXIST in the container!");
+//     }
+//   }
+// }
 } // namespace
 
 TEST_CASE("Client can autoreconnect", "[client][autoreconnect]")

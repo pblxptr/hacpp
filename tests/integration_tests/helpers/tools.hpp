@@ -6,7 +6,7 @@
 
 #include "test_config.hpp"
 
-#include <hacpp/mqtt/async_mqtt_client.hpp>
+#include <hacpp/async_mqtt_client.h>
 
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/io_context.hpp>
@@ -14,6 +14,8 @@
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <spdlog/sinks/stdout_color_sinks.h>
+
+#include <filesystem>
 
 constexpr auto MqttServerAddressOptionName = "--tp_mqtt_server_address";
 constexpr auto MqttServerPortOptionName = "--tp_mqtt_server_port";
@@ -81,52 +83,6 @@ struct IoContext
     boost::asio::executor_work_guard<decltype(ioc_.get_executor())> work{ioc_.get_executor()};
 };
 
-inline auto default_config()
-{
-  return hacpp::ClientConfig{
-      .unique_id = DefaultUniqueId,
-      .username = DefaultUsername,
-      .password = DefaultPassword,
-      .host = DefaultMqttServerAddress,
-      .port = DefaultMqttServerPort};
-}
-
-inline auto local_config()
-{
-  return hacpp::ClientConfig{
-      .unique_id = DefaultUniqueId,
-      .username = LocalUsername,
-      .password = LocalPassword,
-      .host = LocalMqttServerAddress,
-      .port = LocalMqttServerPort,
-      .keep_alive = 0x1234,
-      .max_attempts = 0};
-}
-
-inline auto config_from_options()
-{
-  auto unique_id = TestConfig::get().option_value(MqttUniqueIdOptionName).value_or(DefaultUniqueId);
-  auto username = TestConfig::get().option_value(MqttUsernameOptionName).value_or(DefaultUsername);
-  auto password = TestConfig::get().option_value(MqttPasswordOptionName).value_or(DefaultPassword);
-  auto server_address = TestConfig::get().option_value(MqttServerAddressOptionName).value_or(DefaultMqttServerAddress);
-  auto server_port = TestConfig::get().option_value(DefaultMqttServerPort).value_or(DefaultMqttServerPort);
-
-  return hacpp::ClientConfig{
-      .unique_id = unique_id,
-      .username = username,
-      .password = password,
-      .host = server_address,
-      .port = server_port,
-      .clean_session = true,
-      .keep_alive = DefaultKeepAlive,
-      .max_attempts = 0};
-}
-
-inline auto get_config()
-{
-  return local_config();
-}
-
 inline auto setup_logger(const std::string& logger_name, spdlog::level::level_enum level)
 {
   // Console sink
@@ -140,36 +96,51 @@ inline auto setup_logger(const std::string& logger_name, spdlog::level::level_en
   spdlog::register_logger(logger);
 }
 
-template <typename T>
-boost::asio::awaitable<hacpp::PublishPacket_t> async_get_publish_packet(T& client)
-{
-  const auto& result = co_await client.async_receive();
-  REQUIRE(result);
-  const auto& value = result.value();
-  REQUIRE(std::holds_alternative<hacpp::PublishPacket_t>(value));
+// inline void run_proxy(const std::string& cmd)
+// {
+//   auto path = std::string{"/home/env/manage_proxy.py"};
 
-  co_return std::get<hacpp::PublishPacket_t>(value);
-}
+//   if (!std::filesystem::exists(path)) {
+//     path = std::string{INTEGRATION_TEST_ENV_DIR} + "/manage_proxy.py";
+//   }
 
-template <typename T>
-boost::asio::awaitable<void> async_subscribe(T& client, const std::string& topic)
+//   auto full_cmd = "python3 " + path + " " + cmd;
+//   // NOLINTNEXTLINE(concurrency-mt-unsafe, cert-env33-c): integration test invokes the proxy helper process.
+//   auto res = std::system(full_cmd.c_str());
+//   if (res != 0) {
+//     spdlog::error("Failed to run proxy command: {} (exit code: {})", full_cmd, res);
+//   }
+// }
+
+
+inline void run_proxy(const std::string& cmd)
 {
-  {
-    auto sub_topics = std::vector<std::string>{topic};
-    const auto result = co_await client.async_subscribe(std::move(sub_topics));
-    REQUIRE(result);
+  std::string path = "/home/env/manage_proxy.py";
+
+  if (!std::filesystem::exists(path)) {
+    path = std::string(INTEGRATION_TEST_ENV_DIR) + "/manage_proxy.py";
   }
 
-  {
-    const auto result = co_await client.async_receive();
-    REQUIRE(result);
-    REQUIRE(std::holds_alternative<hacpp::SubscriptionAckPacket_t>(result.value()));
-  }
-}
+  spdlog::debug("Running proxy command: '{}' using script: {}", cmd, path);
 
-template <typename T>
-boost::asio::awaitable<void> async_connect(T& client)
-{
-  const auto error_code = co_await client.async_connect();
-  REQUIRE(!error_code);
+  auto full_cmd = "python3 " + path + " " + cmd;
+  // NOLINTNEXTLINE(concurrency-mt-unsafe, cert-env33-c): integration test invokes the proxy helper process.
+  int res = std::system(full_cmd.c_str());
+
+  if (res != 0) {
+    spdlog::error("Failed to run proxy command: {} (exit code: {})", full_cmd, res);
+
+    // Diagnostic: Check if python3 actually exists in a common location
+    if (std::filesystem::exists("/usr/bin/python3")) {
+      spdlog::info("/usr/bin/python3 exists. Attempting with absolute path...");
+      full_cmd = "/usr/bin/python3 " + path + " " + cmd;
+      // NOLINTNEXTLINE(concurrency-mt-unsafe, cert-env33-c): integration test invokes the proxy helper process.
+      res = std::system(full_cmd.c_str());
+      if (res == 0) {
+        return;
+      }
+    } else {
+      spdlog::error("/usr/bin/python3 DOES NOT EXIST in the container!");
+    }
+  }
 }
