@@ -173,6 +173,8 @@ class Entity
 
     boost::asio::awaitable<Error> async_setup()
     {
+      spdlog::debug("Triggering setup");
+
       auto err = co_await async_discovery();
       if (err) {
         co_return err;
@@ -255,6 +257,7 @@ class Entity
     boost::asio::awaitable<Error> handle_err(Error err)
     {
       if (err == ErrorCode::SessionLost) {
+        spdlog::debug("Session lost, triggering setup");
         co_return co_await async_setup();
       }
 

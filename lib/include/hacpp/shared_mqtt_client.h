@@ -197,6 +197,19 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
       co_return err;
     }
 
+    boost::asio::awaitable<RecvResult> async_recv(std::shared_ptr<SharedClientState> state)
+    {
+      const auto registered_client = std::ranges::any_of(
+          clients_,
+          [&state](const std::weak_ptr<SharedClientState>& weak_client) { return weak_client.lock() == state; });
+
+      if (!registered_client) {
+        clients_.push_back(state);
+      }
+
+      co_return co_await state->queue().pop_front();
+    }
+
     boost::asio::awaitable<void> async_pump_one()
     {
       remove_expired_clients();
@@ -204,9 +217,14 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
       auto result = co_await client_.async_recv();
 
       if (!result) {
+        spdlog::debug("Received error in shared MQTT connection pump, forwarding to all clients: {}", result.error().message());
+
         for (const auto& weak_client : clients_) {
           if (auto client = weak_client.lock()) {
+            spdlog::debug("Forwarding error to shared client");
             co_await client->queue().push_back(result);
+          } else {
+            spdlog::debug("Shared client has expired, skipping");
           }
         }
         co_return;
@@ -276,7 +294,8 @@ boost::asio::awaitable<Error> SharedAsyncMqttClient::async_subscribe(Args... arg
 
 inline boost::asio::awaitable<RecvResult> SharedAsyncMqttClient::async_recv()
 {
-  co_return co_await state_->queue().pop_front();
+  co_return co_await shared_connection_->async_recv(state_);
+  // co_return co_await state_->queue().pop_front();
 }
 
 } // namespace hacpp::mqtt

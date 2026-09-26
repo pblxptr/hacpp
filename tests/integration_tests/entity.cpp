@@ -2,6 +2,7 @@
 #include "helpers/tools.hpp"
 
 #include <hacpp/async_mqtt_client.h>
+#include <hacpp/shared_mqtt_client.h>
 #include <hacpp/entity.h>
 #include <hacpp/error.h>
 
@@ -39,9 +40,10 @@ struct SetupCounters
     int subscribe_calls{0};
 };
 
-class TestEntity : protected Entity<TestEntity, ClientType>
+template <typename Client = ClientType>
+class TestEntity : protected Entity<TestEntity<Client>, Client>
 {
-    using Base = Entity<TestEntity, ClientType>;
+    using Base = Entity<TestEntity<Client>, Client>;
     friend Base;
 
   public:
@@ -55,7 +57,7 @@ class TestEntity : protected Entity<TestEntity, ClientType>
         EntityCfg cfg;
     };
 
-    TestEntity(ClientType client, std::shared_ptr<SetupCounters> counters)
+    TestEntity(Client client, std::shared_ptr<SetupCounters> counters)
         : Base{std::move(client)}
         , counters_{std::move(counters)}
     {}
@@ -130,7 +132,7 @@ TEST_CASE("Entity calls setup again after client reconnect", "[entity][autorecon
         auto err = co_await client.async_connect();
         REQUIRE(!err);
 
-        auto entity = std::make_shared<TestEntity>(std::move(client), counters);
+        auto entity = std::make_shared<TestEntity<>>(std::move(client), counters);
 
         err = co_await entity->async_setup();
         REQUIRE(!err);
@@ -174,4 +176,108 @@ TEST_CASE("Entity calls setup again after client reconnect", "[entity][autorecon
   // Initial increment + one after reconnect
   REQUIRE(counters->discovery_calls == 2);
   REQUIRE(counters->subscribe_calls == 2);
+}
+
+TEST_CASE("Multiple entities using the same shared connection are able to recover after reconnection", "[entity][autoreconnect_shared]")
+{
+  // Arrange
+  auto io = boost::asio::io_context{};
+  static auto keep_run = std::atomic<bool>{true};
+  auto strand = boost::asio::make_strand(io);
+  auto proxy_config = config();
+  proxy_config.port = "1884";
+  auto counters1 = std::make_shared<SetupCounters>();
+  auto counters2 = std::make_shared<SetupCounters>();
+
+  run_proxy("setup");
+  run_proxy("reconnect");
+
+  // Act && Assert
+  // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+  // clang-tidy 19 does not recognize C++23 explicit object parameters as the safe pattern here.
+  boost::asio::co_spawn(
+      strand,
+      [strand, &io, proxy_config, counters1, counters2](this auto /* self */) -> boost::asio::awaitable<void> {
+        auto connection =
+            hacpp::mqtt::SharedAsyncMqttConnection::create(hacpp::mqtt::AsyncMqttClient{strand, proxy_config});
+        auto err = co_await connection->async_connect();
+        REQUIRE(!err);
+
+        auto entity1 = std::make_shared<TestEntity<hacpp::mqtt::SharedAsyncMqttClient>>(
+          connection->make_client(), counters1);
+        auto entity2 = std::make_shared<TestEntity<hacpp::mqtt::SharedAsyncMqttClient>>(
+          connection->make_client(), counters2);
+
+        err = co_await entity1->async_setup();
+        REQUIRE(!err);
+        err = co_await entity2->async_setup();
+        REQUIRE(!err);
+
+        REQUIRE(counters1->discovery_calls == 1);
+        REQUIRE(counters1->subscribe_calls == 1);
+        REQUIRE(counters2->discovery_calls == 1);
+        REQUIRE(counters2->subscribe_calls == 1);
+
+        const auto initial_discovery_calls1 = counters1->discovery_calls;
+        const auto initial_subscribe_calls1 = counters1->subscribe_calls;
+        const auto initial_discovery_calls2 = counters2->discovery_calls;
+        const auto initial_subscribe_calls2 = counters2->subscribe_calls;
+
+        boost::asio::co_spawn(
+            strand,
+            [connection]() -> boost::asio::awaitable<void> {
+              while (keep_run) {
+                co_await connection->async_pump_one();
+              }
+            },
+            boost::asio::detached);
+
+        boost::asio::co_spawn(
+            strand,
+            [entity1]() -> boost::asio::awaitable<void> {
+              auto packet = co_await entity1->async_recv();
+              REQUIRE(!packet);
+              REQUIRE(packet.error() == ErrorCode::Disconnected);
+              spdlog::debug("Entity 1 received disconnect error as expected");
+              co_return;
+            },
+            rethrow);
+
+        boost::asio::co_spawn(
+            strand,
+            [entity2]() -> boost::asio::awaitable<void> {
+              auto packet = co_await entity2->async_recv();
+              REQUIRE(!packet);
+              REQUIRE(packet.error() == ErrorCode::Disconnected);
+              spdlog::debug("Entity 2 received disconnect error as expected");
+              co_return;
+            },
+            rethrow);
+
+        auto timer = boost::asio::steady_timer{strand};
+        timer.expires_after(ReconnectTriggerDelay);
+        co_await timer.async_wait(boost::asio::use_awaitable);
+
+        run_proxy("disconnect");
+
+        timer.expires_after(std::chrono::seconds{2});
+        co_await timer.async_wait(boost::asio::use_awaitable);
+
+        run_proxy("reconnect");
+        co_await wait_for_setup_replay(strand, counters1, initial_discovery_calls1, initial_subscribe_calls1);
+        co_await wait_for_setup_replay(strand, counters2, initial_discovery_calls2, initial_subscribe_calls2);
+        co_await entity1->async_close();
+        co_await entity2->async_close();
+
+        io.stop();
+
+      }, rethrow
+  );
+
+  io.run();
+
+  REQUIRE(counters1->discovery_calls == 2);
+  REQUIRE(counters1->subscribe_calls == 2);
+  REQUIRE(counters2->discovery_calls == 2);
+  REQUIRE(counters2->subscribe_calls == 2);
 }

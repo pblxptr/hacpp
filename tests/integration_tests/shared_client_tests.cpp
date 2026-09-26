@@ -118,7 +118,6 @@ TEST_CASE(
       [strand, &counters, subscribed_count, ready_to_publish](this auto /* self */) -> boost::asio::awaitable<void> {
         auto shared_connection =
             hacpp::mqtt::SharedAsyncMqttConnection::create(hacpp::mqtt::AsyncMqttClient{strand, config()});
-
         auto err = co_await shared_connection->async_connect();
         REQUIRE(!err);
 
