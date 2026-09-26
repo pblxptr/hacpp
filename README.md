@@ -69,6 +69,14 @@ Tests are managed with Catch2. Integration tests run within a Docker environment
    docker compose up --build --exit-code-from test test
    ```
 
+## Documentation
+
+Short API notes live in [`docs/`](docs/README.md):
+
+- [Client lifecycle](docs/client-lifecycle.md)
+- [Entities](docs/entities.md)
+- [Errors and reconnect](docs/errors-and-reconnect.md)
+
 ## Development
 
 ### Code Quality
