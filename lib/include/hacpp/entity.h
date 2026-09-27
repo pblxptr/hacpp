@@ -1,6 +1,7 @@
 #pragma once
 
 #include <hacpp/async_mqtt_client.h>
+#include <hacpp/logger.h>
 
 #include <boost/asio/io_context.hpp>
 #include <boost/json.hpp>
@@ -164,7 +165,7 @@ class Entity
 
     boost::asio::awaitable<Error> async_setup()
     {
-      spdlog::debug("Triggering setup");
+      detail::logger()->debug("Triggering setup");
 
       auto err = co_await async_discovery();
       if (err) {
@@ -248,7 +249,7 @@ class Entity
     boost::asio::awaitable<Error> handle_err(Error err)
     {
       if (err == ErrorCode::SessionReset) {
-        spdlog::debug("Session reset, triggering setup");
+        detail::logger()->debug("Session reset, triggering setup");
         co_return co_await async_setup();
       }
 

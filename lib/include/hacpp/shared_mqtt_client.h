@@ -1,13 +1,13 @@
 #pragma once
 
 #include <hacpp/async_mqtt_client.h>
+#include <hacpp/logger.h>
 
 #include <boost/asio/any_io_executor.hpp>
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/redirect_error.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/use_awaitable.hpp>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <deque>
@@ -30,7 +30,7 @@ class RecvResultQueue
 
     boost::asio::awaitable<void> push_back(RecvResult result)
     {
-      spdlog::debug("RecvResultQueue::{}:", __func__);
+      detail::logger()->debug("RecvResultQueue::{}:", __func__);
 
       queue_.push_back(std::move(result));
       timer_.cancel();
@@ -39,7 +39,7 @@ class RecvResultQueue
 
     boost::asio::awaitable<RecvResult> pop_front()
     {
-      spdlog::debug("RecvResultQueue::{}:", __func__);
+      detail::logger()->debug("RecvResultQueue::{}:", __func__);
 
       boost::system::error_code ec;
 
@@ -52,7 +52,7 @@ class RecvResultQueue
           co_return std::unexpected(map_err(ec));
         }
 
-        spdlog::error("Wait timer has been cancelled but queue is still empty and timer finished with no error");
+        detail::logger()->error("Wait timer has been cancelled but queue is still empty and timer finished with no error");
         co_return std::unexpected(ErrorCode::InternalError);
       }
 
@@ -233,14 +233,16 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
       auto result = co_await client_.async_recv();
 
       if (!result) {
-        spdlog::debug("Received error in shared MQTT connection pump, forwarding to all clients: {}", result.error().message());
+        detail::logger()->debug(
+            "Received error in shared MQTT connection pump, forwarding to all clients: {}",
+            result.error().message());
 
         for (const auto& weak_client : clients_) {
           if (auto client = weak_client.lock()) {
-            spdlog::debug("Forwarding error to shared client");
+            detail::logger()->debug("Forwarding error to shared client");
             co_await client->queue().push_back(result);
           } else {
-            spdlog::debug("Shared client has expired, skipping");
+            detail::logger()->debug("Shared client has expired, skipping");
           }
         }
         co_return result.error() == ErrorCode::SessionReset ? ErrorCode::Success : result.error();
@@ -249,7 +251,7 @@ class SharedAsyncMqttConnection : public std::enable_shared_from_this<SharedAsyn
       const auto* packet = result->get_if<PublishPacket>();
       if (packet == nullptr) {
         result->visit([](auto&& packet) {
-          spdlog::warn(
+          detail::logger()->warn(
               "Received non-publish packet in shared MQTT connection pump, skipping: {}",
               detail::str(packet));
         });

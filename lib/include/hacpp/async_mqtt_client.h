@@ -2,8 +2,7 @@
 
 #include <async_mqtt/all.hpp>
 #include <hacpp/error.h>
-
-#include <spdlog/spdlog.h>
+#include <hacpp/logger.h>
 
 #include <cstdint>
 #include <expected>
@@ -19,9 +18,6 @@ using TopicSubopts = async_mqtt::topic_subopts;
 using QoS = async_mqtt::qos;
 using RecvResult = std::expected<async_mqtt::packet_variant, Error>;
 using PublishPacket = async_mqtt::v5::publish_packet;
-
-// TODO(pbiel): Use logger instance instead of global spdlog functions, and configure
-// it properly (e.g., set log level, format, sinks).
 
 namespace detail {
 template <typename T>
@@ -104,7 +100,7 @@ class AsyncMqttClient
           boost::asio::redirect_error(boost::asio::use_awaitable, err));
 
       if (err) {
-        spdlog::error("Underlying handshake error: {}", err.message());
+        detail::logger()->error("Underlying handshake error: {}", err.message());
         co_return map_err(err);
       }
 
@@ -118,14 +114,14 @@ class AsyncMqttClient
           boost::asio::redirect_error(boost::asio::use_awaitable, err));
 
       if (err) {
-        spdlog::error("Connect error: {}", err.message());
+        detail::logger()->error("Connect error: {}", err.message());
         co_return map_err(err);
       }
 
       conn_.state = State::Connected;
       conn_.attempt = 0;
 
-      spdlog::debug("Connected successfully, connack: {}", detail::str(connack_packet));
+      detail::logger()->debug("Connected successfully, connack: {}", detail::str(connack_packet));
 
       co_return ErrorCode::Success;
     }
@@ -156,14 +152,14 @@ class AsyncMqttClient
     boost::asio::awaitable<Error>
     async_publish(std::string topic, std::string payload, async_mqtt::qos qos = async_mqtt::qos::at_most_once)
     {
-      spdlog::debug("Publishing to topic: {}, payload: {}, QoS: {}", topic, payload, static_cast<int>(qos));
+      detail::logger()->debug("Publishing to topic: {}, payload: {}, QoS: {}", topic, payload, static_cast<int>(qos));
 
       if (conn_.state == State::Reconnecting) {
         co_await async_wait_autoreconnect();
       }
 
       if (conn_.state != State::Connected) {
-        spdlog::warn("Not connected, cannot publish");
+        detail::logger()->warn("Not connected, cannot publish");
         co_return ErrorCode::NotConnected;
       }
 
@@ -174,21 +170,21 @@ class AsyncMqttClient
           async_mqtt::v5::publish_packet{pid, std::move(topic), std::move(payload), qos},
           boost::asio::redirect_error(boost::asio::use_awaitable, err));
 
-      spdlog::debug("Publish completed with error code: {} ({})", err.value(), err.message());
+      detail::logger()->debug("Publish completed with error code: {} ({})", err.value(), err.message());
 
       if (err) {
         co_return map_err(err);
       }
 
-      spdlog::debug("Publish result: ");
+      detail::logger()->debug("Publish result: ");
       if (pubres.puback_opt) {
-        spdlog::debug("PubAck: {}", detail::str(pubres.puback_opt));
+        detail::logger()->debug("PubAck: {}", detail::str(pubres.puback_opt));
       }
       if (pubres.pubrec_opt) {
-        spdlog::debug("PubRec: {}", detail::str(pubres.pubrec_opt));
+        detail::logger()->debug("PubRec: {}", detail::str(pubres.pubrec_opt));
       }
       if (pubres.pubcomp_opt) {
-        spdlog::debug("PubComp: {}", detail::str(pubres.pubcomp_opt));
+        detail::logger()->debug("PubComp: {}", detail::str(pubres.pubcomp_opt));
       }
 
       co_return ErrorCode::Success;
@@ -201,7 +197,7 @@ class AsyncMqttClient
       }
 
       if (conn_.state != State::Connected) {
-        spdlog::warn("Not connected, cannot subscribe");
+        detail::logger()->warn("Not connected, cannot subscribe");
         co_return ErrorCode::NotConnected;
       }
 
@@ -217,7 +213,7 @@ class AsyncMqttClient
       }
 
       if (suback_opt) {
-        spdlog::debug("SubAck: {}", detail::str(suback_opt));
+        detail::logger()->debug("SubAck: {}", detail::str(suback_opt));
       }
 
       co_return ErrorCode::Success;
@@ -237,7 +233,7 @@ class AsyncMqttClient
         co_return std::unexpected(ErrorCode::InvalidPacket);
       }
 
-      packet->visit([](auto&& p) { spdlog::debug("Received packet: {}", detail::str(p)); });
+      packet->visit([](auto&& p) { detail::logger()->debug("Received packet: {}", detail::str(p)); });
 
       co_return RecvResult{*packet};
     }
@@ -249,11 +245,11 @@ class AsyncMqttClient
       co_await conn_.autorec_wait_timer.async_wait(boost::asio::redirect_error(boost::asio::use_awaitable, err));
 
       if (err == boost::asio::error::operation_aborted) {
-        spdlog::debug("Reconnect wait finished by notification");
+        detail::logger()->debug("Reconnect wait finished by notification");
       } else if (err) {
-        spdlog::warn("Reconnect wait failed: {}", err.message());
+        detail::logger()->warn("Reconnect wait failed: {}", err.message());
       } else {
-        spdlog::warn("Reconnect wait timer expired unexpectedly");
+        detail::logger()->warn("Reconnect wait timer expired unexpectedly");
       }
     }
 
@@ -264,7 +260,7 @@ class AsyncMqttClient
       }
 
       if (conn_.state == State::Reconnecting) {
-        spdlog::warn("Already reconnecting, cannot handle another reconnect");
+        detail::logger()->warn("Already reconnecting, cannot handle another reconnect");
         co_return ErrorCode::InternalError;
       }
 
@@ -277,7 +273,7 @@ class AsyncMqttClient
 
       auto err = Error{};
       while (conn_.attempt++ < conn_.max_attempts) {
-        spdlog::debug("Reconnecting, attempt: {}/{}", conn_.attempt, conn_.max_attempts);
+        detail::logger()->debug("Reconnecting, attempt: {}/{}", conn_.attempt, conn_.max_attempts);
 
         timer.expires_after(std::chrono::seconds{delay});
         co_await timer.async_wait(boost::asio::use_awaitable);
@@ -288,11 +284,11 @@ class AsyncMqttClient
         if (!err) {
           conn_.state = State::Connected;
           conn_.autorec_wait_timer.cancel();
-          spdlog::debug("Reconnection successful");
+          detail::logger()->debug("Reconnection successful");
           co_return ErrorCode::SessionReset;
         }
 
-        spdlog::debug("Reconnecting failed: {}", err.message());
+        detail::logger()->debug("Reconnecting failed: {}", err.message());
       }
 
       conn_.state = State::Closed;

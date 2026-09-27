@@ -1,12 +1,12 @@
 #pragma once
 
-  #include <async_mqtt/protocol/error.hpp>
+#include <async_mqtt/protocol/error.hpp>
+#include <hacpp/logger.h>
 
-  #include <boost/asio/error.hpp>
-  #include <boost/system/error_code.hpp>
-  #include <spdlog/spdlog.h>
+#include <boost/asio/error.hpp>
+#include <boost/system/error_code.hpp>
 
-  #include <string>
+#include <string>
 
 namespace hacpp::mqtt {
 
@@ -157,7 +157,7 @@ inline boost::system::error_code map_err(const boost::system::error_code& ec)
     return detail::map_mqtt_error(ec.value());
   }
 
-  spdlog::warn("Unknown error category: {} ({}), err: {}", ec.category().name(), ec.value(), ec.message());
+  detail::logger()->warn("Unknown error category: {} ({}), err: {}", ec.category().name(), ec.value(), ec.message());
 
   return ErrorCode::UnknownError;
 }
