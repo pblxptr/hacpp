@@ -164,6 +164,12 @@ class Factory<Cover, Client>
         , client_(std::move(client))
     {}
 
+    auto& set(const Device& device)
+    {
+      cfg_.set(device);
+      return *this;
+    }
+
     template <typename T, typename V>
     auto& set(T&& key, V&& value)
     {
@@ -221,6 +227,7 @@ class Factory<Cover, Client>
   private:
     std::string unique_id_;
     EntityCfg cfg_{
+        {Property{"unique_id"}, unique_id_},
         {CoverCfg::Opt::CommandTopic, default_component_command_topic(CoverCfg::Defs::Component, unique_id_)},
         {CoverCfg::Opt::StateTopic, default_component_state_topic(CoverCfg::Defs::Component, unique_id_)}
     };

@@ -124,6 +124,12 @@ class Factory<Button, Client>
         , client_(std::move(client))
     {}
 
+    auto& set(const Device& device)
+    {
+      cfg_.set(device);
+      return *this;
+    }
+
     template <typename T, typename V>
     auto& set(T&& key, V&& value)
     {
@@ -155,6 +161,7 @@ class Factory<Button, Client>
   private:
     std::string unique_id_;
     EntityCfg cfg_{
+        {Property{"unique_id"}, unique_id_},
         {ButtonCfg::Opt::PayloadPress, ButtonCfg::Defs::PayloadPress},
         {ButtonCfg::Opt::CommandTopic, default_component_command_topic(ButtonCfg::Defs::Component, unique_id_)}
     };

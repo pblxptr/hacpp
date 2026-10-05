@@ -113,6 +113,12 @@ class Factory<BinarySensor, Client>
         , client_(std::move(client))
     {}
 
+    auto& set(const Device& device)
+    {
+      cfg_.set(device);
+      return *this;
+    }
+
     template <typename T, typename V>
     auto& set(T&& key, V&& value)
     {
@@ -137,6 +143,7 @@ class Factory<BinarySensor, Client>
   private:
     std::string unique_id_;
     EntityCfg cfg_{
+        {Property{"unique_id"}, unique_id_},
         {BinarySensorCfg::Opt::PayloadOn, BinarySensorCfg::Defs::PayloadOn},
         {BinarySensorCfg::Opt::PayloadOff, BinarySensorCfg::Defs::PayloadOff},
         {BinarySensorCfg::Opt::StateTopic,

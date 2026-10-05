@@ -105,6 +105,12 @@ class Factory<Sensor, Client>
         , client_(std::move(client))
     {}
 
+    auto& set(const Device& device)
+    {
+      cfg_.set(device);
+      return *this;
+    }
+
     template <typename T, typename V>
     auto& set(T&& key, V&& value)
     {
@@ -129,6 +135,7 @@ class Factory<Sensor, Client>
   private:
     std::string unique_id_;
     EntityCfg cfg_{
+        {Property{"unique_id"}, unique_id_},
         {SensorCfg::Opt::StateTopic, default_component_state_topic(SensorCfg::Defs::Component, unique_id_)}
     };
     QoS qos_ = QoS::at_most_once;
