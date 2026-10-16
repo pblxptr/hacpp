@@ -8,6 +8,7 @@ add_executable(hacpp-integration-tests
   button.cpp
   cover.cpp
   shared_client_tests.cpp
+  retain.cpp
 )
 
 find_package(Boost REQUIRED COMPONENTS log filesystem)

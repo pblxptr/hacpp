@@ -34,6 +34,8 @@ if (err) {
 
 Setup performs the entity-specific discovery publish, command subscriptions if needed, and availability publish if an availability topic is configured.
 
+Discovery configuration is always published with MQTT retain enabled for every entity type.
+
 ## Publishing state
 
 State entities expose `async_update_state()`.
@@ -45,6 +47,8 @@ co_await cover.async_update_state("open");
 ```
 
 `Cover::async_update_state()` returns `InvalidConfig` if no state topic is configured.
+
+State updates are always retained. A subscriber joining later receives the latest configuration and state from the broker. Availability publishes are not retained. Low-level `AsyncMqttClient::async_publish()` calls remain non-retained by default; pass `true` as the fourth argument to retain a message.
 
 ## Handling commands
 

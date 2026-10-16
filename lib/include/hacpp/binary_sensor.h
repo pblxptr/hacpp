@@ -69,7 +69,8 @@ class BinarySensor : protected Entity<BinarySensor<Client>, Client>
       co_return co_await async_publish(
           config_.cfg.at(BinarySensorCfg::Opt::StateTopic),
           state ? config_.cfg.at(BinarySensorCfg::Opt::PayloadOn) : config_.cfg.at(BinarySensorCfg::Opt::PayloadOff),
-          config_.qos);
+          config_.qos,
+          true);
     }
 
     boost::asio::awaitable<Error> async_run()
@@ -92,7 +93,8 @@ class BinarySensor : protected Entity<BinarySensor<Client>, Client>
       co_return co_await async_publish(
           default_component_discovery_topic(BinarySensorCfg::Defs::Component, config_.unique_id),
           json,
-          config_.qos);
+          config_.qos,
+          true);
     }
 
     boost::asio::awaitable<Error> async_subscribe_impl() // NOLINT(readability-convert-member-functions-to-static)

@@ -87,7 +87,7 @@ class Cover : protected Entity<Cover<Client>, Client>
         co_return ErrorCode::InvalidConfig;
       }
 
-      co_return co_await async_publish(config_.cfg.at(CoverCfg::Opt::StateTopic), state, config_.qos);
+      co_return co_await async_publish(config_.cfg.at(CoverCfg::Opt::StateTopic), state, config_.qos, true);
     }
 
   public:
@@ -139,7 +139,8 @@ class Cover : protected Entity<Cover<Client>, Client>
       co_return co_await async_publish(
           default_component_discovery_topic(CoverCfg::Defs::Component, config_.unique_id),
           json,
-          config_.qos);
+          config_.qos,
+          true);
     }
 
     boost::asio::awaitable<Error> async_subscribe_impl()

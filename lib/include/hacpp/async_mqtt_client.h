@@ -149,8 +149,11 @@ class AsyncMqttClient
       co_return map_err(err);
     }
 
-    boost::asio::awaitable<Error>
-    async_publish(std::string topic, std::string payload, async_mqtt::qos qos = async_mqtt::qos::at_most_once)
+    boost::asio::awaitable<Error> async_publish(
+        std::string topic,
+        std::string payload,
+        async_mqtt::qos qos = async_mqtt::qos::at_most_once,
+        bool retain = false)
     {
       detail::logger()->debug("Publishing to topic: {}, payload: {}, QoS: {}", topic, payload, static_cast<int>(qos));
 
@@ -167,7 +170,11 @@ class AsyncMqttClient
       auto pid = qos > QoS::at_most_once ? co_await impl_.async_acquire_unique_packet_id()
                                          : static_cast<async_mqtt::basic_packet_id_type<2>::type>(0);
       auto pubres = co_await impl_.async_publish(
-          async_mqtt::v5::publish_packet{pid, std::move(topic), std::move(payload), qos},
+          async_mqtt::v5::publish_packet{
+              pid,
+              std::move(topic),
+              std::move(payload),
+              qos | (retain ? async_mqtt::pub::retain::yes : async_mqtt::pub::retain::no)},
           boost::asio::redirect_error(boost::asio::use_awaitable, err));
 
       detail::logger()->debug("Publish completed with error code: {} ({})", err.value(), err.message());

@@ -74,7 +74,8 @@ class Button : protected Entity<Button<Client>, Client>
       co_return co_await async_publish(
           default_component_discovery_topic(ButtonCfg::Defs::Component, config_.unique_id),
           json,
-          config_.qos);
+          config_.qos,
+          true);
     }
 
     boost::asio::awaitable<Error> async_subscribe_impl()
