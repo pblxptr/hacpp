@@ -164,7 +164,7 @@ class Factory<Cover, Client> : public CommonFactory
         : unique_id_(std::move(unique_id))
         , client_(std::move(client))
     {
-      cfg_.set(CoverCfg::Opt::PayloadClose, nullptr);
+      cfg_.set(CoverCfg::Opt::PayloadStop, nullptr);
     }
 
     template <typename... T>
