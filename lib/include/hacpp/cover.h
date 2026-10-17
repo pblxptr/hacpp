@@ -167,6 +167,13 @@ class Factory<Cover, Client> : public CommonFactory
       cfg_.set(CoverCfg::Opt::PayloadClose, nullptr);
     }
 
+    template <typename Key, typename Value>
+    auto& set(Key&& key, Value&& value)
+    {
+      CommonFactory::set(cfg_, std::forward<Key>(key), std::forward<Value>(value));
+      return *this;
+    }
+
     auto& on_open(CoverCfg::Handler handler)
     {
       on_open_ = std::move(handler);
