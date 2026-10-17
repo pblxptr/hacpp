@@ -157,25 +157,14 @@ class Cover : protected Entity<Cover<Client>, Client>
 };
 
 template <typename Client>
-class Factory<Cover, Client>
+class Factory<Cover, Client> : public CommonFactory
 {
   public:
     Factory(std::string unique_id, Client client)
         : unique_id_(std::move(unique_id))
         , client_(std::move(client))
-    {}
-
-    auto& set(const Device& device)
     {
-      cfg_.set(device);
-      return *this;
-    }
-
-    template <typename T, typename V>
-    auto& set(T&& key, V&& value)
-    {
-      cfg_.set(std::forward<T>(key), std::forward<V>(value));
-      return *this;
+      cfg_.set(CoverCfg::Opt::PayloadClose, nullptr);
     }
 
     auto& on_open(CoverCfg::Handler handler)
@@ -230,7 +219,8 @@ class Factory<Cover, Client>
     EntityCfg cfg_{
         {Property{"unique_id"}, unique_id_},
         {CoverCfg::Opt::CommandTopic, default_component_command_topic(CoverCfg::Defs::Component, unique_id_)},
-        {CoverCfg::Opt::StateTopic, default_component_state_topic(CoverCfg::Defs::Component, unique_id_)}
+        {CoverCfg::Opt::StateTopic, default_component_state_topic(CoverCfg::Defs::Component, unique_id_)},
+        {Availability::Opt::Topic, default_component_availability_topic(CoverCfg::Defs::Component, unique_id_)},
     };
     QoS qos_ = QoS::at_least_once;
     Client client_;

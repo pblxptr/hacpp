@@ -137,7 +137,8 @@ class Factory<Sensor, Client>
     std::string unique_id_;
     EntityCfg cfg_{
         {Property{"unique_id"}, unique_id_},
-        {SensorCfg::Opt::StateTopic, default_component_state_topic(SensorCfg::Defs::Component, unique_id_)}
+        {SensorCfg::Opt::StateTopic, default_component_state_topic(SensorCfg::Defs::Component, unique_id_)},
+        {Availability::Opt::Topic, default_component_availability_topic(SensorCfg::Defs::Component, unique_id_)},
     };
     QoS qos_ = QoS::at_most_once;
     Client client_;

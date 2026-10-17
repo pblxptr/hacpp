@@ -164,7 +164,8 @@ class Factory<Button, Client>
     EntityCfg cfg_{
         {Property{"unique_id"}, unique_id_},
         {ButtonCfg::Opt::PayloadPress, ButtonCfg::Defs::PayloadPress},
-        {ButtonCfg::Opt::CommandTopic, default_component_command_topic(ButtonCfg::Defs::Component, unique_id_)}
+        {ButtonCfg::Opt::CommandTopic, default_component_command_topic(ButtonCfg::Defs::Component, unique_id_)},
+        {Availability::Opt::Topic, default_component_availability_topic(ButtonCfg::Defs::Component, unique_id_)},
     };
     QoS qos_ = QoS::at_least_once;
     Client client_;

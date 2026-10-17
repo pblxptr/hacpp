@@ -68,6 +68,20 @@ class EntityCfg
       }
     }
 
+    EntityCfg& set(const Property& prop, std::nullptr_t)
+    {
+      if (prop.obj_key.empty()) {
+        obj_[prop.key] = nullptr;
+        return *this;
+      }
+
+      if (!obj_.contains(prop.obj_key)) {
+        obj_[prop.obj_key] = nullptr;
+      }
+
+      return *this;
+    }
+
     EntityCfg& set(const Property& prop, const std::string& value)
     {
       if (prop.obj_key.empty()) {
