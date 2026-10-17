@@ -220,7 +220,7 @@ class Entity
                                                                    : Availability::Defs::PayloadNotAvailable;
       }
 
-      co_return co_await async_publish(cfg.at(Availability::Opt::Topic), val, impl().config_.qos);
+      co_return co_await async_publish(cfg.at(Availability::Opt::Topic), val, impl().config_.qos, true);
     }
 
     template <typename... Args>
